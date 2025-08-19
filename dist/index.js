@@ -50,7 +50,7 @@ app.get('/api/customer-data/:customerId/:customerHash', (req, res) => __awaiter(
                 error: 'Customer ID and Customer Hash are required'
             });
         }
-        const customerData = yield (0, bumesApi_1.getCustomerData)(customerId, customerHash);
+        const customerData = yield (0, bumesApi_1.getCustomerTariffs)(customerId, customerHash);
         if (!customerData.success) {
             return res.status(404).json(customerData);
         }

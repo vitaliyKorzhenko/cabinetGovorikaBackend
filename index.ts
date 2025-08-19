@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { getTask, getTaskQuickly, triggerN8nWebhook, getCustomerData, getLastLessons, getCustomerInterfaceData } from './bumesApi';
+import { getLastLessons, getCustomerInterfaceData, getCustomerTariffs } from './bumesApi';
 
 
 // спсбио а дайте его логин пароль
@@ -51,7 +51,7 @@ app.get('/api/customer-data/:customerId/:customerHash', async (req, res) => {
       });
     }
 
-    const customerData = await getCustomerData(customerId, customerHash);
+    const customerData = await getCustomerTariffs(customerId, customerHash);
     
     if (!customerData.success) {
       return res.status(404).json(customerData);

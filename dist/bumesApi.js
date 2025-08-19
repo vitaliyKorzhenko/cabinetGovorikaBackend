@@ -9,7 +9,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCustomerInterfaceData = exports.getCustomerData = exports.getLastLessons = exports.getCustomerTariffs = exports.getClientToken = exports.triggerN8nWebhook = exports.getTaskQuickly = exports.getTask = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
+exports.getCustomerInterfaceData = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
+const apiReference_1 = require("./apiReference");
 const MAIN_URL = 'https://main.okk24.com';
 const BASE_URL = MAIN_URL;
 // Константы для авторизации
@@ -77,91 +78,6 @@ const loginToAdminPanel = (...args_1) => __awaiter(void 0, [...args_1], void 0, 
 });
 exports.loginToAdminPanel = loginToAdminPanel;
 // https://main.okk24.com/bumess/api/task/get
-//get Task
-const getTask = () => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const loginResponse = yield (0, exports.loginToAdminPanel)();
-        if (!loginResponse.success) {
-            return null;
-        }
-        const token = (0, exports.getCurrentToken)();
-        if (!token) {
-            return null;
-        }
-        const response = yield fetch(`${BASE_URL}/bumess/api/task/get`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token.token}`,
-                'Accept': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
-            }
-        });
-        if (!response) {
-            return null;
-        }
-        const data = yield response.json();
-        return data;
-    }
-    catch (error) {
-        return null;
-    }
-});
-exports.getTask = getTask;
-// https://main.okk24.com/bumess/api/task/get_quickly - get Task Quickly
-const getTaskQuickly = () => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const loginResponse = yield (0, exports.loginToAdminPanel)();
-        if (!loginResponse.success) {
-            return null;
-        }
-        const token = (0, exports.getCurrentToken)();
-        if (!token) {
-            return null;
-        }
-        const response = yield fetch(`${BASE_URL}/bumess/api/task/get_quickly`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token.token}`,
-                'Accept': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
-            }
-        });
-        if (!response) {
-            return null;
-        }
-        const data = yield response.json();
-        console.log('getTaskQuickly', data);
-        return data;
-    }
-    catch (error) {
-        return null;
-    }
-});
-exports.getTaskQuickly = getTaskQuickly;
-const triggerN8nWebhook = () => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const response = yield fetch(triggerWebhookUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = yield response.json();
-        console.log('Webhook triggered successfully:', data);
-        return data;
-    }
-    catch (error) {
-        console.error('Error triggering n8n webhook:', error);
-        return null;
-    }
-});
-exports.triggerN8nWebhook = triggerN8nWebhook;
 // Получение клиентского токена
 const getClientToken = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -224,6 +140,58 @@ const getCustomerTariffs = (customerId, clientToken) => __awaiter(void 0, void 0
     }
 });
 exports.getCustomerTariffs = getCustomerTariffs;
+// Получение расписания тарифа клиента
+const getCustomerTariffSchedule = (tariffId, clientToken) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const response = yield fetch(`${BASE_URL}/api/customer_tariff/${tariffId}/schedule`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL,
+                'Referer': `${BASE_URL}/login`
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = yield response.json();
+        console.log('Customer tariff schedule received:', data);
+        return data;
+    }
+    catch (error) {
+        console.error('Error getting customer tariff schedule:', error);
+        return null;
+    }
+});
+exports.getCustomerTariffSchedule = getCustomerTariffSchedule;
+// Получение расписания регулярных уроков клиента
+const getRegularLessonsSchedule = (customerId, clientToken) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const response = yield fetch(`${BASE_URL}/api/regular_lessons/schedule/${customerId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL,
+                'Referer': `${BASE_URL}/login`
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = yield response.json();
+        console.log('Regular lessons schedule received:', data);
+        return data;
+    }
+    catch (error) {
+        console.error('Error getting regular lessons schedule:', error);
+        return null;
+    }
+});
+exports.getRegularLessonsSchedule = getRegularLessonsSchedule;
 // Получение последних уроков
 const getLastLessons = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -250,7 +218,6 @@ const getLastLessons = (customerId, customerHash) => __awaiter(void 0, void 0, v
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = yield response.json();
-        console.log('Last lessons received:', data);
         return data;
     }
     catch (error) {
@@ -294,7 +261,6 @@ const getCustomerData = (customerId, customerHash) => __awaiter(void 0, void 0, 
 exports.getCustomerData = getCustomerData;
 // Получение структурированных данных клиента для интерфейса
 const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
         // Сначала получаем клиентский токен
         const tokenData = yield (0, exports.getClientToken)(customerId, customerHash);
@@ -303,46 +269,69 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
         }
         // Получаем данные клиента и уроков
         const lessonsData = yield (0, exports.getLastLessons)(customerId, customerHash);
+        console.log('lessonsData', lessonsData);
         if (!lessonsData) {
             throw new Error('Failed to get customer data');
         }
-        console.log('lessonsData structure:', JSON.stringify(lessonsData, null, 2));
-        // Структурируем данные для интерфейса
-        const customer = (_a = lessonsData[0]) === null || _a === void 0 ? void 0 : _a.customer;
-        const nextLesson = lessonsData[0]; // Берем первый урок из массива
-        const teacher = nextLesson === null || nextLesson === void 0 ? void 0 : nextLesson.teacher;
-        console.log('customer:', customer);
-        console.log('nextLesson:', nextLesson);
-        if (!customer || !nextLesson) {
-            throw new Error('Customer or lesson data not found');
-        }
-        // Форматируем данные для интерфейса согласно CustomerInterfaceData
-        const interfaceData = {
-            customer: {
-                name: customer.name,
+        // Извлекаем данные детей из массива уроков
+        const children = yield Promise.all(lessonsData.map((lesson) => __awaiter(void 0, void 0, void 0, function* () {
+            const customer = lesson.customer;
+            const teacher = lesson.teacher;
+            const active_tariffs = customer.active_tariffs;
+            let main_tariff = customer.main_tariff ? customer.main_tariff : null;
+            const active_tariffs_data = active_tariffs.map((tariff) => {
+                return {
+                    id: tariff.id,
+                    template_id: tariff.tariff.id,
+                    name: tariff.name,
+                    begin_date: tariff.begin_date,
+                    end_date: tariff.end_date,
+                    duration: tariff.duration,
+                    custom_ind_period_limit: tariff.custom_ind_period_limit
+                };
+            });
+            return {
                 id: customer.id,
-                game_url: nextLesson.game_url || ''
-            },
-            balance: {
-                balance: customer.balance,
-                balance_status: customer.balance_status,
-                balance_status_updated: customer.balance_status_updated
-            },
-            nextLesson: {
-                start_customer: nextLesson.start_customer,
-                start_customer_day: nextLesson.start_customer_day,
-                time_to: nextLesson.time_to,
-                web_join_url: nextLesson.web_join_url,
-                can_move: nextLesson.can_move,
-                free_cancelation: nextLesson.free_cancelation,
-                subject_id: nextLesson.subject_id
-            },
-            teacher: {
-                name: (teacher === null || teacher === void 0 ? void 0 : teacher.name) || 'Не указан',
-                id: (teacher === null || teacher === void 0 ? void 0 : teacher.id) || 0
-            }
+                name: customer.name,
+                email: customer.email,
+                phone: customer.phone,
+                birthday: customer.birthday,
+                age: customer.custom_age ? parseFloat(customer.custom_age) : 0,
+                language: null, // Пока оставляем null, так как в данных нет информации о языке
+                balance: customer.balance || 0,
+                environment: apiReference_1.Environment.GOVORIKA,
+                subscriptions: null,
+                available_subscriptions: null,
+                last_record: null,
+                recommended_courses: null,
+                active_tariffs: active_tariffs_data,
+                main_tariff: main_tariff ? {
+                    id: main_tariff.id,
+                    template_id: main_tariff.tariff.id,
+                    name: main_tariff.name,
+                    begin_date: main_tariff.begin_date,
+                    end_date: main_tariff.end_date,
+                    duration: main_tariff.duration,
+                    custom_ind_period_limit: main_tariff.custom_ind_period_limit
+                } : null,
+                next_lesson: {
+                    id: lesson.id,
+                    type: lesson.type,
+                    start_date: lesson.start,
+                    teacher: {
+                        id: teacher.id,
+                        name: teacher.name
+                    },
+                    zoom_link: lesson.web_join_url,
+                    time_to: lesson.time_to
+                }
+            };
+        })));
+        return {
+            language: null,
+            environment: apiReference_1.Environment.GOVORIKA,
+            children: children
         };
-        return interfaceData;
     }
     catch (error) {
         console.error('Error getting customer interface data:', error);

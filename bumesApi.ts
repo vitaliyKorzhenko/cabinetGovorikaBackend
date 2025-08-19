@@ -1,3 +1,4 @@
+import ClientResponse, { Child, Environment, Tariff } from "./apiReference";
 
 const MAIN_URL =  'https://main.okk24.com';
 
@@ -98,96 +99,11 @@ export const loginToAdminPanel = async (
 
 // https://main.okk24.com/bumess/api/task/get
 
-//get Task
 
-export const getTask = async (): Promise<any> => {
-    try {
-        const loginResponse = await loginToAdminPanel();
-        if (!loginResponse.success) {
-            return null;
-        }   
 
-        const token = getCurrentToken();
-        if (!token) {
-            return null;
-        }
 
-        const response = await fetch(`${BASE_URL}/bumess/api/task/get`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token.token}`,
-                'Accept': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
-            }
-        });
-  
-        if (!response) {
-            return null;
-        }
 
-        const data = await response.json();
-        return data;
-    } catch (error) {
-        return null;
-    }
-}
 
-// https://main.okk24.com/bumess/api/task/get_quickly - get Task Quickly
-export const getTaskQuickly = async (): Promise<any> => {
-    try {
-        const loginResponse = await loginToAdminPanel();
-        if (!loginResponse.success) {
-            return null;
-        }
-        const token = getCurrentToken();
-        if (!token) {
-            return null;
-        }
-        const response = await fetch(`${BASE_URL}/bumess/api/task/get_quickly`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token.token}`,
-                'Accept': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
-            }
-        });
-  
-        if (!response) {
-            return null;
-        }
-
-        const data = await response.json();
-        console.log('getTaskQuickly', data);
-        return data;
-    } catch (error) {
-        return null;
-    }
-}
-
-export const triggerN8nWebhook = async (): Promise<any> => {
-    try {
-        const response = await fetch(triggerWebhookUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('Webhook triggered successfully:', data);
-        return data;
-    } catch (error) {
-        console.error('Error triggering n8n webhook:', error);
-        return null;
-    }
-}
 
 // Получение клиентского токена
 export const getClientToken = async (customerId: string, customerHash: string): Promise<any> => {
@@ -255,6 +171,60 @@ export const getCustomerTariffs = async (customerId: string, clientToken: string
     }
 }
 
+// Получение расписания тарифа клиента
+export const getCustomerTariffSchedule = async (tariffId: string, clientToken: string): Promise<any> => {
+    try {
+        const response = await fetch(`${BASE_URL}/api/customer_tariff/${tariffId}/schedule`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL,
+                'Referer': `${BASE_URL}/login`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Customer tariff schedule received:', data);
+        return data;
+    } catch (error) {
+        console.error('Error getting customer tariff schedule:', error);
+        return null;
+    }
+}
+
+// Получение расписания регулярных уроков клиента
+export const getRegularLessonsSchedule = async (customerId: string, clientToken: string): Promise<any> => {
+    try {
+        const response = await fetch(`${BASE_URL}/api/regular_lessons/schedule/${customerId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL,
+                'Referer': `${BASE_URL}/login`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Regular lessons schedule received:', data);
+        return data;
+    } catch (error) {
+        console.error('Error getting regular lessons schedule:', error);
+        return null;
+    }
+}
+
 // Получение последних уроков
 export const getLastLessons = async (customerId: string, customerHash: string): Promise<any> => {
     try {
@@ -284,7 +254,6 @@ export const getLastLessons = async (customerId: string, customerHash: string): 
         }
 
         const data = await response.json();
-        console.log('Last lessons received:', data);
         return data;
     } catch (error) {
         console.error('Error getting last lessons:', error);
@@ -327,6 +296,8 @@ export const getCustomerData = async (customerId: string, customerHash: string):
 }
 
 
+
+
 interface CustomerInterfaceData {
     customer: {
         name: string;
@@ -354,7 +325,7 @@ interface CustomerInterfaceData {
 }
 
 // Получение структурированных данных клиента для интерфейса
-export const getCustomerInterfaceData = async (customerId: string, customerHash: string): Promise<CustomerInterfaceData> => {
+export const getCustomerInterfaceData = async (customerId: string, customerHash: string): Promise<ClientResponse> => {
     try {
         // Сначала получаем клиентский токен
         const tokenData = await getClientToken(customerId, customerHash);
@@ -365,52 +336,75 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
         // Получаем данные клиента и уроков
         const lessonsData = await getLastLessons(customerId, customerHash);
 
+        console.log('lessonsData', lessonsData);
+
         if (!lessonsData) {
             throw new Error('Failed to get customer data');
         }
 
-        console.log('lessonsData structure:', JSON.stringify(lessonsData, null, 2));
+        // Извлекаем данные детей из массива уроков
+        const children: Child[] = await Promise.all(lessonsData.map(async (lesson: any) => {
+            const customer = lesson.customer;
+            const teacher = lesson.teacher;
+            const active_tariffs = customer.active_tariffs;
+            let main_tariff = customer.main_tariff ? customer.main_tariff : null;
 
-        // Структурируем данные для интерфейса
-        const customer = lessonsData[0]?.customer;
-        const nextLesson = lessonsData[0]; // Берем первый урок из массива
-        const teacher = nextLesson?.teacher;
+            const active_tariffs_data: Tariff[] = active_tariffs.map((tariff: any) => {
+                return {
+                    id: tariff.id,
+                    template_id: tariff.tariff.id,
+                    name: tariff.name,
+                    begin_date: tariff.begin_date,
+                    end_date: tariff.end_date,
+                    duration: tariff.duration,
+                    custom_ind_period_limit: tariff.custom_ind_period_limit
+                }
+            });
 
-        console.log('customer:', customer);
-        console.log('nextLesson:', nextLesson);
-
-        if (!customer || !nextLesson) {
-            throw new Error('Customer or lesson data not found');
-        }
-
-        // Форматируем данные для интерфейса согласно CustomerInterfaceData
-        const interfaceData: CustomerInterfaceData = {
-            customer: {
-                name: customer.name,
+            return {
                 id: customer.id,
-                game_url: nextLesson.game_url || ''
-            },
-            balance: {
-                balance: customer.balance,
-                balance_status: customer.balance_status,
-                balance_status_updated: customer.balance_status_updated
-            },
-            nextLesson: {
-                start_customer: nextLesson.start_customer,
-                start_customer_day: nextLesson.start_customer_day,
-                time_to: nextLesson.time_to,
-                web_join_url: nextLesson.web_join_url,
-                can_move: nextLesson.can_move,
-                free_cancelation: nextLesson.free_cancelation,
-                subject_id: nextLesson.subject_id
-            },
-            teacher: {
-                name: teacher?.name || 'Не указан',
-                id: teacher?.id || 0
-            }
+                name: customer.name,
+                email: customer.email,
+                phone: customer.phone,
+                birthday: customer.birthday,
+                age: customer.custom_age ? parseFloat(customer.custom_age) : 0,
+                language: null, // Пока оставляем null, так как в данных нет информации о языке
+                balance: customer.balance || 0,
+                environment: Environment.GOVORIKA,
+                subscriptions: null,
+                available_subscriptions: null,
+                last_record: null,
+                recommended_courses: null,
+                active_tariffs: active_tariffs_data,
+                main_tariff: main_tariff ? {
+                    id: main_tariff.id,
+                    template_id: main_tariff.tariff.id,
+                    name: main_tariff.name,
+                    begin_date: main_tariff.begin_date,
+                    end_date: main_tariff.end_date,
+                    duration: main_tariff.duration,
+                    custom_ind_period_limit: main_tariff.custom_ind_period_limit
+                } : null,
+                next_lesson: {
+                    id: lesson.id,
+                    type: lesson.type,
+                    start_date: lesson.start,
+                    teacher: {
+                        id: teacher.id,
+                        name: teacher.name
+                    },
+                    zoom_link: lesson.web_join_url,
+                    time_to: lesson.time_to
+                }
+            };
+        }));
+
+        return {
+            language: null,
+            environment: Environment.GOVORIKA,
+            children: children
         };
 
-        return interfaceData;
     } catch (error) {
         console.error('Error getting customer interface data:', error);
         throw error;
