@@ -295,6 +295,91 @@ export const getCustomerData = async (customerId: string, customerHash: string):
     }
 }
 
+// Получение регулярных уроков клиента по предмету
+export const getCustomerRegularLessons = async (
+    customerId: string, 
+    subjectId: number, 
+    clientToken: string
+): Promise<any> => {
+    try {
+        let url: string;
+        
+        if (subjectId === 0) {
+            // Если subjectId = 0, получаем все предметы
+            url = `${BASE_URL}/api/customer_regular_lessons/${customerId}`;
+        } else {
+            // Если указан конкретный предмет
+            url = `${BASE_URL}/api/customer_regular_lessons/${customerId}/${subjectId}`;
+        }
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL,
+                'Referer': `${BASE_URL}/login`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log(`Regular lessons for customer ${customerId}, subject ${subjectId}:`, data);
+        return data;
+    } catch (error) {
+        console.error('Error getting customer regular lessons:', error);
+        return null;
+    }
+}
+
+// Получение доступных тарифов для клиента
+export const getAvailableTariffs = async (customerId: string): Promise<any> => {
+    try {
+        const response = await fetch(`${BASE_URL}/api/tariff?customer_id=${customerId}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL,
+                'Referer': `${BASE_URL}/login`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log(`Available tariffs for customer ${customerId}:`, data);
+        
+        // Маппинг данных в формат AvailableSubscription
+        if (Array.isArray(data)) {
+            const mappedTariffs = data.map((tariff: any) => ({
+                id: tariff.id,
+                type: tariff.type,
+                duration: tariff.duration,
+                frequency: tariff.lessons_count || 1, // Используем lessons_count как frequency
+                name: tariff.name,
+                price: tariff.price,
+                lessons_count: tariff.lessons_count,
+                added: tariff.added
+            }));
+            
+            console.log(`Mapped tariffs for customer ${customerId}:`, mappedTariffs);
+            return mappedTariffs;
+        }
+        
+        return data;
+    } catch (error) {
+        console.error('Error getting available tariffs:', error);
+        return null;
+    }
+}
+
 
 
 
@@ -361,40 +446,39 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
                 }
             });
 
+            // Получаем доступные тарифы для ученика
+            const availableTariffs = await getAvailableTariffs(customer.id.toString());
+
             return {
                 id: customer.id,
                 name: customer.name,
                 email: customer.email,
                 phone: customer.phone,
                 birthday: customer.birthday,
+                real_timezone: customer.timezone,
+                timezone: customer.timezone,
+                hobby: customer.hobby,
                 age: customer.custom_age ? parseFloat(customer.custom_age) : 0,
                 language: null, // Пока оставляем null, так как в данных нет информации о языке
                 balance: customer.balance || 0,
                 environment: Environment.GOVORIKA,
-                subscriptions: null,
-                available_subscriptions: null,
+                available_subscriptions: availableTariffs, // Помещаем доступные тарифы
                 last_record: null,
                 recommended_courses: null,
-                active_tariffs: active_tariffs_data,
-                main_tariff: main_tariff ? {
-                    id: main_tariff.id,
-                    template_id: main_tariff.tariff.id,
-                    name: main_tariff.name,
-                    begin_date: main_tariff.begin_date,
-                    end_date: main_tariff.end_date,
-                    duration: main_tariff.duration,
-                    custom_ind_period_limit: main_tariff.custom_ind_period_limit
-                } : null,
+                subscriptions: active_tariffs_data,
                 next_lesson: {
                     id: lesson.id,
                     type: lesson.type,
-                    start_date: lesson.start,
+                    start: lesson.start,
+                    start_customer: lesson.start_customer,
+                    start_customer_day: lesson.start_customer_day,
                     teacher: {
                         id: teacher.id,
                         name: teacher.name
                     },
                     zoom_link: lesson.web_join_url,
-                    time_to: lesson.time_to
+                    time_to: lesson.time_to,
+                    lesson_language_id: lesson.lesson_language_id
                 }
             };
         }));

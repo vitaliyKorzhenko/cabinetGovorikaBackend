@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { getLastLessons, getCustomerInterfaceData, getCustomerTariffs } from './bumesApi';
+import { getLastLessons, getCustomerInterfaceData, getCustomerTariffs, getCustomerRegularLessons } from './bumesApi';
 
 
 // спсбио а дайте его логин пароль
@@ -121,6 +121,60 @@ app.get('/api/customer-info/:customerId/:customerHash', async (req, res) => {
     });
   } catch (error) {
     console.error('Error in customer-info endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// API для получения регулярных уроков клиента по предмету
+app.get('/api/customer-regular-lessons/:customerId/:customerHash/:subjectId', async (req, res) => {
+  try {
+    const { customerId, customerHash, subjectId } = req.params;
+    
+    if (!customerId || !customerHash) {
+      return res.status(400).json({
+        success: false,
+        error: 'Customer ID and Customer Hash are required'
+      });
+    }
+
+    const subjectIdNum = parseInt(subjectId);
+    if (isNaN(subjectIdNum)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Subject ID must be a valid number'
+      });
+    }
+
+    // Сначала получаем клиентский токен
+    const { getClientToken } = await import('./bumesApi');
+    const tokenData = await getClientToken(customerId, customerHash);
+    
+    if (!tokenData || !tokenData.token) {
+      return res.status(401).json({
+        success: false,
+        error: 'Failed to get client token'
+      });
+    }
+
+    // Получаем регулярные уроки
+    const regularLessons = await getCustomerRegularLessons(customerId, subjectIdNum, tokenData.token);
+    
+    if (!regularLessons) {
+      return res.status(404).json({
+        success: false,
+        error: 'Failed to get regular lessons'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: regularLessons
+    });
+  } catch (error) {
+    console.error('Error in customer-regular-lessons endpoint:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Internal server error'

@@ -41,11 +41,14 @@ enum Language {
   interface NextLesson {
     id: number;
     type: number; // Тип урока
-    start_date: string; // Дата начала урока
+    start: string;
+    start_customer: string
+    start_customer_day: string;
     teacher: Teacher; // Преподаватель
     zoom_link: string; // Ссылка на урок в Zoom
     status: LessonStatus; // Статус урока
     time_to: string; // Время до урока
+    lesson_language_id: string
   }
   
   interface LastLessonRecord {
@@ -71,6 +74,10 @@ enum Language {
     type: SubscriptionType; // Скорее всего у абонемента есть тип, нужен перечень всех типов.
     duration: number; // Продолжительность одного занятия
     frequency: number; // Количество занятий в неделю
+    name: string; // Название тарифа
+    price: string; // Цена тарифа
+    lessons_count: number; // Количество уроков в тарифе
+    added: string; // Дата добавления тарифа
   }
   
   interface Subscription extends AvailableSubscription {
@@ -111,6 +118,9 @@ enum Language {
     recommended_courses: RecommendedCourse[] | null; // Рекомендованные груповые занятия, и/или индивидуальные курсы для ребенка
     active_tariffs: Tariff[] | null; // Активные тарифы ребенка
     main_tariff: Tariff | null; // Основной тариф ребенка
+    hobby:  string | null; // Хобби ребенка
+    real_timezone: string | null; // Часовой пояс ребенка
+    timezone: string;
   }
   
   interface ClientResponse {
