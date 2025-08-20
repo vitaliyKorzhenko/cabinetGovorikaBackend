@@ -131,8 +131,49 @@ const getCustomerTariffs = (customerId, clientToken) => __awaiter(void 0, void 0
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = yield response.json();
-        console.log('Customer tariffs received:', data);
-        return data;
+        // Маппинг данных в формат Subscription с regular_lessons
+        let tarrifData = data.data;
+        console.log('Customer tariffs received:', tarrifData);
+        let mappedTariffs;
+        if (tarrifData && Array.isArray(tarrifData)) {
+            mappedTariffs = tarrifData.map((tariff) => ({
+                id: tariff.id,
+                type: tariff.type,
+                name: tariff.name,
+                price: tariff.price,
+                duration: tariff.duration || 30, // По умолчанию 30 минут
+                start_date: tariff.begin_date_c,
+                end_date: tariff.end_date_c,
+                is_active: tariff.is_active === 1,
+                regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson) => ({
+                    id: lesson.id,
+                    alfa_customer_id: lesson.alfa_customer_id,
+                    lesson_type_id: lesson.lesson_type_id,
+                    subject_id: lesson.subject_id,
+                    day: lesson.day,
+                    teacher_id: lesson.teacher_id,
+                    external_id: lesson.external_id,
+                    b_date: lesson.b_date,
+                    e_date: lesson.e_date,
+                    time_from: lesson.time_from,
+                    time_to: lesson.time_to,
+                    created_at: lesson.created_at,
+                    updated_at: lesson.updated_at,
+                    is_active: lesson.is_active,
+                    need_prolong: lesson.need_prolong,
+                    parent_id: lesson.parent_id,
+                    created_by: lesson.created_by,
+                    expired: lesson.expired,
+                    customerString: lesson.customerString,
+                    adminString: lesson.adminString,
+                    beginLocalHuman: lesson.beginLocalHuman,
+                    endLocalHuman: lesson.endLocalHuman
+                })) : [] // Расписание регулярных урок с нужными полями
+            }));
+            console.log(`Mapped tariffs with schedule for customer ${customerId}:`, mappedTariffs);
+            return mappedTariffs;
+        }
+        return mappedTariffs;
     }
     catch (error) {
         console.error('Error getting customer tariffs:', error);
@@ -310,7 +351,6 @@ const getAvailableTariffs = (customerId) => __awaiter(void 0, void 0, void 0, fu
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = yield response.json();
-        console.log(`Available tariffs for customer ${customerId}:`, data);
         // Маппинг данных в формат AvailableSubscription
         if (Array.isArray(data)) {
             const mappedTariffs = data.map((tariff) => ({
@@ -323,7 +363,6 @@ const getAvailableTariffs = (customerId) => __awaiter(void 0, void 0, void 0, fu
                 lessons_count: tariff.lessons_count,
                 added: tariff.added
             }));
-            console.log(`Mapped tariffs for customer ${customerId}:`, mappedTariffs);
             return mappedTariffs;
         }
         return data;
@@ -338,13 +377,13 @@ exports.getAvailableTariffs = getAvailableTariffs;
 const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Сначала получаем клиентский токен
+        console.log("====== START getCustomerInterfaceData ======");
         const tokenData = yield (0, exports.getClientToken)(customerId, customerHash);
         if (!tokenData || !tokenData.token) {
             throw new Error('Failed to get client token');
         }
         // Получаем данные клиента и уроков
         const lessonsData = yield (0, exports.getLastLessons)(customerId, customerHash);
-        console.log('lessonsData', lessonsData);
         if (!lessonsData) {
             throw new Error('Failed to get customer data');
         }
@@ -352,19 +391,9 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
         const children = yield Promise.all(lessonsData.map((lesson) => __awaiter(void 0, void 0, void 0, function* () {
             const customer = lesson.customer;
             const teacher = lesson.teacher;
-            const active_tariffs = customer.active_tariffs;
-            let main_tariff = customer.main_tariff ? customer.main_tariff : null;
-            const active_tariffs_data = active_tariffs.map((tariff) => {
-                return {
-                    id: tariff.id,
-                    template_id: tariff.tariff.id,
-                    name: tariff.name,
-                    begin_date: tariff.begin_date,
-                    end_date: tariff.end_date,
-                    duration: tariff.duration,
-                    custom_ind_period_limit: tariff.custom_ind_period_limit
-                };
-            });
+            // Получаем тарифы клиента с расписанием через API
+            const customerTariffs = yield (0, exports.getCustomerTariffs)(customer.id.toString(), tokenData.token);
+            console.log(`Customer tariffs with schedule for ${customer.name}:`, customerTariffs);
             // Получаем доступные тарифы для ученика
             const availableTariffs = yield (0, exports.getAvailableTariffs)(customer.id.toString());
             return {
@@ -383,7 +412,6 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
                 available_subscriptions: availableTariffs, // Помещаем доступные тарифы
                 last_record: null,
                 recommended_courses: null,
-                subscriptions: active_tariffs_data,
                 next_lesson: {
                     id: lesson.id,
                     type: lesson.type,
@@ -397,7 +425,8 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
                     zoom_link: lesson.web_join_url,
                     time_to: lesson.time_to,
                     lesson_language_id: lesson.lesson_language_id
-                }
+                },
+                subscriptions: customerTariffs, // Помещаем тарифы с расписанием из API
             };
         })));
         return {

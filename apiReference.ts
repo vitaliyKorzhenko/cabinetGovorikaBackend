@@ -87,6 +87,7 @@ enum Language {
     is_active: boolean; // Статус активности абонемента
     teacher: Teacher; // Педагог который прикреплен к абонементу
     available_lessons: AvailableLesson[]; // Список доступных уроков в абонементе
+    regular_lessons: any[]; // Расписание регулярных уроков
   }
 
 
@@ -98,7 +99,7 @@ enum Language {
     end_date: string;
     duration: number;
     custom_ind_period_limit: number;
-
+    regular_lessons: any[]; // Расписание регулярных уроков для тарифа
   }
   
   export interface Child {
@@ -111,7 +112,7 @@ enum Language {
     email: string[]; // Email ребенка
     phone: string[]; // Телефон ребенка
     environment: Environment; // Окружение|Сервер - Добавить если дети могут находится в разных env-ах
-    subscriptions: Subscription[] | null; // Список всех абонементов ребенка
+    subscriptions: any[] | null; // Список всех абонементов ребенка
     available_subscriptions: AvailableSubscription[] | null; // Список доступных абонементов к продаже
     next_lesson: NextLesson,
     last_record: LastLessonRecord | null; // Запись крайнего урока

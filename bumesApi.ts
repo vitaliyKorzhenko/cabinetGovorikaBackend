@@ -163,8 +163,52 @@ export const getCustomerTariffs = async (customerId: string, clientToken: string
         }
 
         const data = await response.json();
-        console.log('Customer tariffs received:', data);
-        return data;
+       
+        
+        // Маппинг данных в формат Subscription с regular_lessons
+        let tarrifData = data.data;
+        console.log('Customer tariffs received:', tarrifData);
+        let  mappedTariffs;
+        if ( tarrifData && Array.isArray(tarrifData)) {
+            mappedTariffs = tarrifData.map((tariff: any) => ({
+                id: tariff.id,
+                type: tariff.type,
+                name: tariff.name,
+                price: tariff.price,
+                duration: tariff.duration || 30, // По умолчанию 30 минут
+                start_date: tariff.begin_date_c,
+                end_date: tariff.end_date_c,
+                is_active: tariff.is_active === 1,
+                regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson: any) => ({
+                    id: lesson.id,
+                    alfa_customer_id: lesson.alfa_customer_id,
+                    lesson_type_id: lesson.lesson_type_id,
+                    subject_id: lesson.subject_id,
+                    day: lesson.day,
+                    teacher_id: lesson.teacher_id,
+                    external_id: lesson.external_id,
+                    b_date: lesson.b_date,
+                    e_date: lesson.e_date,
+                    time_from: lesson.time_from,
+                    time_to: lesson.time_to,
+                    created_at: lesson.created_at,
+                    updated_at: lesson.updated_at,
+                    is_active: lesson.is_active,
+                    need_prolong: lesson.need_prolong,
+                    parent_id: lesson.parent_id,
+                    created_by: lesson.created_by,
+                    expired: lesson.expired,
+                    customerString: lesson.customerString,
+                    adminString: lesson.adminString,
+                    beginLocalHuman: lesson.beginLocalHuman,
+                    endLocalHuman: lesson.endLocalHuman
+                })) : [] // Расписание регулярных урок с нужными полями
+            }));
+            
+            console.log(`Mapped tariffs with schedule for customer ${customerId}:`, mappedTariffs);
+            return mappedTariffs;
+        }
+        return mappedTariffs;
     } catch (error) {
         console.error('Error getting customer tariffs:', error);
         return null;
@@ -354,7 +398,6 @@ export const getAvailableTariffs = async (customerId: string): Promise<any> => {
         }
 
         const data = await response.json();
-        console.log(`Available tariffs for customer ${customerId}:`, data);
         
         // Маппинг данных в формат AvailableSubscription
         if (Array.isArray(data)) {
@@ -369,7 +412,6 @@ export const getAvailableTariffs = async (customerId: string): Promise<any> => {
                 added: tariff.added
             }));
             
-            console.log(`Mapped tariffs for customer ${customerId}:`, mappedTariffs);
             return mappedTariffs;
         }
         
@@ -382,37 +424,11 @@ export const getAvailableTariffs = async (customerId: string): Promise<any> => {
 
 
 
-
-interface CustomerInterfaceData {
-    customer: {
-        name: string;
-        id: number;
-        game_url: string;    
-    };
-    balance: {
-        balance: number;
-        balance_status: string;
-        balance_status_updated: string;
-    }
-    nextLesson: {
-        start_customer: string;
-        start_customer_day: string;
-        time_to: string;
-        web_join_url: string;
-        can_move: boolean;
-        free_cancelation: boolean;
-        subject_id: number;
-    };
-    teacher: {
-        name: string;
-        id: number;
-    };
-}
-
 // Получение структурированных данных клиента для интерфейса
 export const getCustomerInterfaceData = async (customerId: string, customerHash: string): Promise<ClientResponse> => {
     try {
         // Сначала получаем клиентский токен
+        console.log("====== START getCustomerInterfaceData ======");
         const tokenData = await getClientToken(customerId, customerHash);
         if (!tokenData || !tokenData.token) {
             throw new Error('Failed to get client token');
@@ -421,7 +437,6 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
         // Получаем данные клиента и уроков
         const lessonsData = await getLastLessons(customerId, customerHash);
 
-        console.log('lessonsData', lessonsData);
 
         if (!lessonsData) {
             throw new Error('Failed to get customer data');
@@ -431,20 +446,10 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
         const children: Child[] = await Promise.all(lessonsData.map(async (lesson: any) => {
             const customer = lesson.customer;
             const teacher = lesson.teacher;
-            const active_tariffs = customer.active_tariffs;
-            let main_tariff = customer.main_tariff ? customer.main_tariff : null;
 
-            const active_tariffs_data: Tariff[] = active_tariffs.map((tariff: any) => {
-                return {
-                    id: tariff.id,
-                    template_id: tariff.tariff.id,
-                    name: tariff.name,
-                    begin_date: tariff.begin_date,
-                    end_date: tariff.end_date,
-                    duration: tariff.duration,
-                    custom_ind_period_limit: tariff.custom_ind_period_limit
-                }
-            });
+            // Получаем тарифы клиента с расписанием через API
+            const customerTariffs = await getCustomerTariffs(customer.id.toString(), tokenData.token);
+            console.log(`Customer tariffs with schedule for ${customer.name}:`, customerTariffs);
 
             // Получаем доступные тарифы для ученика
             const availableTariffs = await getAvailableTariffs(customer.id.toString());
@@ -465,7 +470,6 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
                 available_subscriptions: availableTariffs, // Помещаем доступные тарифы
                 last_record: null,
                 recommended_courses: null,
-                subscriptions: active_tariffs_data,
                 next_lesson: {
                     id: lesson.id,
                     type: lesson.type,
@@ -479,7 +483,8 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
                     zoom_link: lesson.web_join_url,
                     time_to: lesson.time_to,
                     lesson_language_id: lesson.lesson_language_id
-                }
+                },
+                subscriptions: customerTariffs, // Помещаем тарифы с расписанием из API
             };
         }));
 
