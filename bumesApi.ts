@@ -1,4 +1,4 @@
-import ClientResponse, { Child, Environment, Tariff } from "./apiReference";
+import ClientResponse, { Child, Environment, Parent, Role, Tariff } from "./apiReference";
 
 const MAIN_URL =  'https://main.okk24.com';
 
@@ -442,17 +442,24 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
             throw new Error('Failed to get customer data');
         }
 
+        console.log("====== lessonsData ======", lessonsData);
         // Извлекаем данные детей из массива уроков
+        let parent: Parent | null = null;
         const children: Child[] = await Promise.all(lessonsData.map(async (lesson: any) => {
             const customer = lesson.customer;
             const teacher = lesson.teacher;
 
             // Получаем тарифы клиента с расписанием через API
             const customerTariffs = await getCustomerTariffs(customer.id.toString(), tokenData.token);
-            console.log(`Customer tariffs with schedule for ${customer.name}:`, customerTariffs);
+            //console.log(`Customer tariffs with schedule for ${customer.name}:`, customerTariffs);
 
             // Получаем доступные тарифы для ученика
             const availableTariffs = await getAvailableTariffs(customer.id.toString());
+
+            parent = {
+                id: customer.parent_id,
+                name: customer.kid_parent_name
+            };
 
             return {
                 id: customer.id,
@@ -467,7 +474,7 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
                 language: null, // Пока оставляем null, так как в данных нет информации о языке
                 balance: customer.balance || 0,
                 environment: Environment.GOVORIKA,
-                available_subscriptions: availableTariffs, // Помещаем доступные тарифы
+               // available_subscriptions: availableTariffs, // Помещаем доступные тарифы
                 last_record: null,
                 recommended_courses: null,
                 next_lesson: {
@@ -489,8 +496,9 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
         }));
 
         return {
-            language: null,
             environment: Environment.GOVORIKA,
+            parent: parent,
+            role: Role.USER,
             children: children
         };
 

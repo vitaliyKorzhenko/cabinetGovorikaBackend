@@ -387,15 +387,21 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
         if (!lessonsData) {
             throw new Error('Failed to get customer data');
         }
+        console.log("====== lessonsData ======", lessonsData);
         // Извлекаем данные детей из массива уроков
+        let parent = null;
         const children = yield Promise.all(lessonsData.map((lesson) => __awaiter(void 0, void 0, void 0, function* () {
             const customer = lesson.customer;
             const teacher = lesson.teacher;
             // Получаем тарифы клиента с расписанием через API
             const customerTariffs = yield (0, exports.getCustomerTariffs)(customer.id.toString(), tokenData.token);
-            console.log(`Customer tariffs with schedule for ${customer.name}:`, customerTariffs);
+            //console.log(`Customer tariffs with schedule for ${customer.name}:`, customerTariffs);
             // Получаем доступные тарифы для ученика
             const availableTariffs = yield (0, exports.getAvailableTariffs)(customer.id.toString());
+            parent = {
+                id: customer.parent_id,
+                name: customer.kid_parent_name
+            };
             return {
                 id: customer.id,
                 name: customer.name,
@@ -409,7 +415,7 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
                 language: null, // Пока оставляем null, так как в данных нет информации о языке
                 balance: customer.balance || 0,
                 environment: apiReference_1.Environment.GOVORIKA,
-                available_subscriptions: availableTariffs, // Помещаем доступные тарифы
+                // available_subscriptions: availableTariffs, // Помещаем доступные тарифы
                 last_record: null,
                 recommended_courses: null,
                 next_lesson: {
@@ -430,8 +436,9 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
             };
         })));
         return {
-            language: null,
             environment: apiReference_1.Environment.GOVORIKA,
+            parent: parent,
+            role: apiReference_1.Role.USER,
             children: children
         };
     }

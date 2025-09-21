@@ -1,6 +1,5 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Role = exports.Environment = void 0;
 var Language;
 (function (Language) {
     Language["UK"] = "uk";
@@ -8,17 +7,17 @@ var Language;
     Language["PL"] = "pl";
     Language["EN"] = "en";
 })(Language || (Language = {})); // Желательно иметь именно такой перечень языков
+var Role;
+(function (Role) {
+    Role["USER"] = "user";
+    Role["ADMIN"] = "admin";
+})(Role || (Role = {}));
 var Environment;
 (function (Environment) {
     Environment["GOVORIKA"] = "govorika";
     Environment["PROMOVA"] = "promova";
     Environment["POLAND"] = "poland";
-})(Environment || (exports.Environment = Environment = {}));
-var Role;
-(function (Role) {
-    Role["USER"] = "user";
-    Role["ADMIN"] = "admin";
-})(Role || (exports.Role = Role = {}));
+})(Environment || (Environment = {}));
 var SubscriptionType;
 (function (SubscriptionType) {
     SubscriptionType["NATIVE_SPEECH"] = "native_speech";

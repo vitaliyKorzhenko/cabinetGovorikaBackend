@@ -5,15 +5,15 @@ enum Language {
     EN = 'en',
   } // Желательно иметь именно такой перечень языков
   
-  export enum Environment {
+  enum Role {
+    USER = 'user',
+    ADMIN = 'admin',
+  }
+  
+  enum Environment {
     GOVORIKA = 'govorika', // Значения|Названия - зависят от реальных
     PROMOVA = 'promova', // Значения|Названия - зависят от реальных
     POLAND = 'poland', // Значения|Названия - зависят от реальных
-  }
-
-  export enum Role {
-    USER = 'user',
-    ADMIN = 'admin',
   }
   
   enum SubscriptionType {
@@ -45,15 +45,11 @@ enum Language {
   
   interface NextLesson {
     id: number;
-    type: number; // Тип урока
-    start: string;
-    start_customer: string
-    start_customer_day: string;
+    type: LessonType; // Тип урока
+    start_date: Date; // Дата начала урока
     teacher: Teacher; // Преподаватель
     zoom_link: string; // Ссылка на урок в Zoom
     status: LessonStatus; // Статус урока
-    time_to: string; // Время до урока
-    lesson_language_id: string
   }
   
   interface LastLessonRecord {
@@ -74,69 +70,39 @@ enum Language {
     price: number; // Цена (в долларах) курса/группового занятия
   }
   
-  interface AvailableSubscription {
-    id: number;
-    type: SubscriptionType; // Скорее всего у абонемента есть тип, нужен перечень всех типов.
-    duration: number; // Продолжительность одного занятия
-    frequency: number; // Количество занятий в неделю
-    name: string; // Название тарифа
-    price: string; // Цена тарифа
-    lessons_count: number; // Количество уроков в тарифе
-    added: string; // Дата добавления тарифа
-  }
   
-  interface Subscription extends AvailableSubscription {
+  
+  interface Subscription {
     id: number;
     start_date: Date; // Дата начала срока действия абонемента
     end_date: Date; // Дата конца срока действия абонемента
     is_active: boolean; // Статус активности абонемента
     teacher: Teacher; // Педагог который прикреплен к абонементу
+    type: SubscriptionType; // Скорее всего у абонемента есть тип, нужен перечень всех типов.
     available_lessons: AvailableLesson[]; // Список доступных уроков в абонементе
-    regular_lessons: any[]; // Расписание регулярных уроков
-  }
-
-
-  export interface Tariff {
-    id: number;
-    template_id: number;
-    name: string;
-    begin_date: string;
-    end_date: string;
-    duration: number;
-    custom_ind_period_limit: number;
-    regular_lessons: any[]; // Расписание регулярных уроков для тарифа
+    duration: number; // Продолжительность одного занятия
+    frequency: number; // Количество занятий в неделю
   }
   
-  export interface Child {
+  interface Child {
     id: number;
     name: string;
     age: number; // Возраст ребенка
     language: Language; // Язык ребенка
     balance: number; // Остаток на счету
-    birthday: string; // Дата рождения ребенка
-    email: string[]; // Email ребенка
-    phone: string[]; // Телефон ребенка
-    subscriptions: any[] | null; // Список всех абонементов ребенка
-    //available_subscriptions: AvailableSubscription[] | null; // Список доступных абонементов к продаже
-    next_lesson: NextLesson,
-    last_record: LastLessonRecord | null; // Запись крайнего урока
-    recommended_courses: RecommendedCourse[] | null; // Рекомендованные груповые занятия, и/или индивидуальные курсы для ребенка
-    active_tariffs: Tariff[] | null; // Активные тарифы ребенка
-    main_tariff: Tariff | null; // Основной тариф ребенка
-    hobby:  string | null; // Хобби ребенка
-    real_timezone: string | null; // Часовой пояс ребенка
-    timezone: string;
-  }
-
-  export interface Parent {
-    id: number;
-    name: string;
+    environment: Environment; // Окружение|Сервер - Добавить если дети могут находится в разных env-ах
+    subscriptions: Subscription[]; // Список всех абонементов ребенка
+    next_lesson: NextLesson[]; // Ближайший урок
+    last_record: LastLessonRecord; // Запись крайнего урока
+    recommended_courses: RecommendedCourse[]; // Рекомендованные груповые занятия, и/или индивидуальные курсы для ребенка
   }
   
   interface ClientResponse {
-    environment: Environment | null; // Окружение|Сервер - Добавить если дети не могут находится в разных env-ах
-    role: Role | null; // Роль клиента
-    parent: Parent | null; // Родитель клиента
+    id: number;
+    name: string;
+    language: Language; // Язык клиента
+    environment: Environment; // Окружение|Сервер - Добавить если дети не могут находится в разных env-ах
+    role: Role;
     children: Child[];
   }
   
