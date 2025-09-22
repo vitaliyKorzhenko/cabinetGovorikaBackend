@@ -198,6 +198,58 @@ app.get('/api/customer-regular-lessons/:customerId/:customerHash/:subjectId', (r
         });
     }
 }));
+// API для генерации JWT токена
+app.post('/api/generate-token', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { customerId, customerHash, env = "govorika" } = req.body;
+        if (!customerId || !customerHash) {
+            return res.status(400).json({
+                success: false,
+                error: 'Customer ID and Customer Hash are required'
+            });
+        }
+        // Импортируем функцию прямо здесь
+        const { generateCustomerToken } = yield Promise.resolve().then(() => __importStar(require('./bumesApi')));
+        const tokenResult = yield generateCustomerToken(customerId, customerHash, env);
+        if (!tokenResult.success) {
+            return res.status(500).json(tokenResult);
+        }
+        res.json(tokenResult);
+    }
+    catch (error) {
+        console.error('Error in generate-token endpoint:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+}));
+// API для получения данных клиента по JWT токену
+app.get('/api/customer-info-token/:token', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { token } = req.params;
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                error: 'Token is required'
+            });
+        }
+        // Импортируем функцию прямо здесь
+        const { getCustomerDataByToken } = yield Promise.resolve().then(() => __importStar(require('./bumesApi')));
+        const customerData = yield getCustomerDataByToken(token);
+        res.json({
+            success: true,
+            data: customerData
+        });
+    }
+    catch (error) {
+        console.error('Error in customer-info-token endpoint:', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Internal server error'
+        });
+    }
+}));
 const server = http_1.default.createServer(app);
 server.listen(port, () => {
     console.log(`🚀 Сервер запущен на порту ${port}`);

@@ -8,9 +8,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
+exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
 const apiReference_1 = require("./apiReference");
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const MAIN_URL = 'https://main.okk24.com';
 const BASE_URL = MAIN_URL;
 // Константы для авторизации
@@ -448,3 +452,81 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
     }
 });
 exports.getCustomerInterfaceData = getCustomerInterfaceData;
+// Генерация JWT токена для клиента
+const generateCustomerToken = (customerId_1, customerHash_1, ...args_1) => __awaiter(void 0, [customerId_1, customerHash_1, ...args_1], void 0, function* (customerId, customerHash, env = "production") {
+    try {
+        const secretKey = process.env.JWT_SECRET;
+        if (!secretKey) {
+            return {
+                success: false,
+                error: 'JWT_SECRET не установлен в переменных окружения'
+            };
+        }
+        const payload = {
+            clientId: customerId,
+            hash: customerHash,
+            env: env
+        };
+        // Генерируем токен без срока истечения (вечный токен)
+        const token = jsonwebtoken_1.default.sign(payload, secretKey);
+        // Формируем URL для фронта
+        const url = `https://example.com/callback?token=${token}`;
+        console.log("Ссылка для фронта:", url);
+        return {
+            success: true,
+            token: token,
+            url: url
+        };
+    }
+    catch (error) {
+        console.error('Error generating customer token:', error);
+        return {
+            success: false,
+            error: 'Ошибка при генерации токена'
+        };
+    }
+});
+exports.generateCustomerToken = generateCustomerToken;
+// Расшифровка JWT токена
+const decodeCustomerToken = (token) => {
+    try {
+        const secretKey = process.env.JWT_SECRET;
+        if (!secretKey) {
+            return {
+                success: false,
+                error: 'JWT_SECRET не установлен в переменных окружения'
+            };
+        }
+        const decoded = jsonwebtoken_1.default.verify(token, secretKey);
+        return {
+            success: true,
+            data: decoded
+        };
+    }
+    catch (error) {
+        console.error('Error decoding customer token:', error);
+        return {
+            success: false,
+            error: 'Неверный или истекший токен'
+        };
+    }
+};
+exports.decodeCustomerToken = decodeCustomerToken;
+// Получение данных клиента по JWT токену
+const getCustomerDataByToken = (token) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Расшифровываем токен
+        const tokenData = (0, exports.decodeCustomerToken)(token);
+        if (!tokenData.success || !tokenData.data) {
+            throw new Error(tokenData.error || 'Ошибка расшифровки токена');
+        }
+        const { clientId: customerId, hash: customerHash } = tokenData.data;
+        // Получаем данные клиента используя существующую функцию
+        return yield (0, exports.getCustomerInterfaceData)(customerId, customerHash);
+    }
+    catch (error) {
+        console.error('Error getting customer data by token:', error);
+        throw error;
+    }
+});
+exports.getCustomerDataByToken = getCustomerDataByToken;

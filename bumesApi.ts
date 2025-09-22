@@ -1,4 +1,5 @@
 import ClientResponse, { Child, Environment, Parent, Role, Tariff } from "./apiReference";
+import jwt from "jsonwebtoken";
 
 const MAIN_URL =  'https://main.okk24.com';
 
@@ -20,6 +21,19 @@ interface TokenData {
 interface Credentials {
     email: string;
     password: string;
+}
+
+interface JwtPayload {
+    clientId: string;
+    hash: string;
+    env: string;
+}
+
+interface JwtTokenResponse {
+    success: boolean;
+    token?: string;
+    url?: string;
+    error?: string;
 }
 
 let currentToken: TokenData | null = null;
@@ -504,6 +518,97 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
 
     } catch (error) {
         console.error('Error getting customer interface data:', error);
+        throw error;
+    }
+}
+
+// Генерация JWT токена для клиента
+export const generateCustomerToken = async (
+    customerId: string, 
+    customerHash: string, 
+    env: string = "production"
+): Promise<JwtTokenResponse> => {
+    try {
+        const secretKey = process.env.JWT_SECRET;
+        
+        if (!secretKey) {
+            return {
+                success: false,
+                error: 'JWT_SECRET не установлен в переменных окружения'
+            };
+        }
+
+        const payload: JwtPayload = {
+            clientId: customerId,
+            hash: customerHash,
+            env: env
+        };
+
+        // Генерируем токен без срока истечения (вечный токен)
+        const token = jwt.sign(payload, secretKey);
+
+        // Формируем URL для фронта
+        const url = `https://example.com/callback?token=${token}`;
+        console.log("Ссылка для фронта:", url);
+
+        return {
+            success: true,
+            token: token,
+            url: url
+        };
+    } catch (error) {
+        console.error('Error generating customer token:', error);
+        return {
+            success: false,
+            error: 'Ошибка при генерации токена'
+        };
+    }
+}
+
+// Расшифровка JWT токена
+export const decodeCustomerToken = (token: string): { success: boolean; data?: JwtPayload; error?: string } => {
+    try {
+        const secretKey = process.env.JWT_SECRET;
+        
+        if (!secretKey) {
+            return {
+                success: false,
+                error: 'JWT_SECRET не установлен в переменных окружения'
+            };
+        }
+
+        const decoded = jwt.verify(token, secretKey) as JwtPayload;
+        
+        return {
+            success: true,
+            data: decoded
+        };
+    } catch (error) {
+        console.error('Error decoding customer token:', error);
+        return {
+            success: false,
+            error: 'Неверный или истекший токен'
+        };
+    }
+}
+
+// Получение данных клиента по JWT токену
+export const getCustomerDataByToken = async (token: string): Promise<ClientResponse> => {
+    try {
+        // Расшифровываем токен
+        const tokenData = decodeCustomerToken(token);
+        
+        if (!tokenData.success || !tokenData.data) {
+            throw new Error(tokenData.error || 'Ошибка расшифровки токена');
+        }
+
+        const { clientId: customerId, hash: customerHash } = tokenData.data;
+        
+        // Получаем данные клиента используя существующую функцию
+        return await getCustomerInterfaceData(customerId, customerHash);
+        
+    } catch (error) {
+        console.error('Error getting customer data by token:', error);
         throw error;
     }
 }
