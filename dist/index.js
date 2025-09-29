@@ -228,6 +228,7 @@ app.get('/api/customer-regular-lessons/:customerId/:customerHash/:subjectId', (r
 app.post('/api/generate-token', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { customerId, customerHash, env = "govorika" } = req.body;
+        console.warn("====== generate-token ======", req.body);
         if (!customerId || !customerHash) {
             return res.status(400).json({
                 success: false,
@@ -289,18 +290,10 @@ app.get('/api/customer-calendar', (req, res) => __awaiter(void 0, void 0, void 0
         // Импортируем функцию прямо здесь
         const { getCustomerCalendar } = yield Promise.resolve().then(() => __importStar(require('./bumesApi')));
         const calendarData = yield getCustomerCalendar(customerId, from, to);
-        if (!calendarData.success) {
+        if (calendarData.success === false) {
             return res.status(500).json(calendarData);
         }
-        res.json({
-            success: true,
-            parameters: {
-                customerId: customerId,
-                from: from,
-                to: to
-            },
-            data: calendarData.data
-        });
+        res.json(calendarData);
     }
     catch (error) {
         console.error('Error in customer-calendar endpoint:', error);

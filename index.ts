@@ -291,19 +291,11 @@ app.get('/api/customer-calendar', async (req, res) => {
     const { getCustomerCalendar } = await import('./bumesApi');
     const calendarData = await getCustomerCalendar(customerId as string, from as string, to as string);
     
-    if (!calendarData.success) {
+    if (calendarData.success === false) {
       return res.status(500).json(calendarData);
     }
 
-    res.json({
-      success: true,
-      parameters: {
-        customerId: customerId as string,
-        from: from as string,
-        to: to as string
-      },
-      data: calendarData.data
-    });
+    res.json(calendarData);
   } catch (error) {
     console.error('Error in customer-calendar endpoint:', error);
     res.status(500).json({

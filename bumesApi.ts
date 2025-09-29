@@ -648,10 +648,8 @@ export const getCustomerCalendar = async (customerId: string, startDate: string,
         }
 
         const data = await response.json();
-        return {
-            success: true,
-            data: data
-        };
+        // Если есть поле data, возвращаем только его содержимое
+        return data.data || data;
     } catch (error) {
         console.error('Error getting customer calendar:', error);
         return {

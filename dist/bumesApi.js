@@ -483,7 +483,7 @@ const generateCustomerToken = (customerId_1, customerHash_1, ...args_1) => __awa
         // Генерируем токен без срока истечения (вечный токен)
         const token = jsonwebtoken_1.default.sign(payload, secretKey);
         // Формируем URL для фронта
-        const url = `https://example.com/callback?token=${token}`;
+        const url = `https://client.slideedu.com/callback?token=${token}`;
         return {
             success: true,
             token: token,
@@ -558,10 +558,8 @@ const getCustomerCalendar = (customerId, startDate, endDate) => __awaiter(void 0
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = yield response.json();
-        return {
-            success: true,
-            data: data
-        };
+        // Если есть поле data, возвращаем только его содержимое
+        return data.data || data;
     }
     catch (error) {
         console.error('Error getting customer calendar:', error);
