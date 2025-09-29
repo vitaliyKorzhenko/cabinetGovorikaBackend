@@ -27,6 +27,39 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
+// Middleware для проверки API токена
+const authenticateApiToken = (req: any, res: any, next: any) => {
+  const apiToken = req.headers['authorization'] || req.headers['x-api-token'];
+  const validToken = process.env.API_TOKEN;
+  
+  // Проверяем, что это не базовые endpoints (ping, root)
+  if (req.path === '/' || req.path === '/ping') {
+    return next();
+  }
+  
+  if (!apiToken || !validToken) {
+    return res.status(401).json({
+      success: false,
+      error: 'API token is required'
+    });
+  }
+  
+  // Убираем 'Bearer ' если есть
+  const token = apiToken.replace('Bearer ', '');
+  
+  if (token !== validToken) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid API token'
+    });
+  }
+  
+  next();
+};
+
+// Применяем middleware ко всем API routes
+app.use('/api', authenticateApiToken);
+
 
 
 //default get route
@@ -234,6 +267,44 @@ app.get('/api/customer-info-token/:token', async (req, res) => {
     });
   } catch (error) {
     console.error('Error in customer-info-token endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// API для получения календаря клиента
+app.get('/api/customer-calendar', async (req, res) => {
+  try {
+    const { customerId, from, to } = req.query;
+    
+    if (!customerId || !from || !to) {
+      return res.status(400).json({
+        success: false,
+        error: 'customerId, from and to parameters are required'
+      });
+    }
+
+    // Импортируем функцию прямо здесь
+    const { getCustomerCalendar } = await import('./bumesApi');
+    const calendarData = await getCustomerCalendar(customerId as string, from as string, to as string);
+    
+    if (!calendarData.success) {
+      return res.status(500).json(calendarData);
+    }
+
+    res.json({
+      success: true,
+      parameters: {
+        customerId: customerId as string,
+        from: from as string,
+        to: to as string
+      },
+      data: calendarData.data
+    });
+  } catch (error) {
+    console.error('Error in customer-calendar endpoint:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Internal server error'

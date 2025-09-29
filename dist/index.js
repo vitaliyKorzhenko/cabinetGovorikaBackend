@@ -65,6 +65,32 @@ app.use((0, cors_1.default)({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+// Middleware для проверки API токена
+const authenticateApiToken = (req, res, next) => {
+    const apiToken = req.headers['authorization'] || req.headers['x-api-token'];
+    const validToken = process.env.API_TOKEN;
+    // Проверяем, что это не базовые endpoints (ping, root)
+    if (req.path === '/' || req.path === '/ping') {
+        return next();
+    }
+    if (!apiToken || !validToken) {
+        return res.status(401).json({
+            success: false,
+            error: 'API token is required'
+        });
+    }
+    // Убираем 'Bearer ' если есть
+    const token = apiToken.replace('Bearer ', '');
+    if (token !== validToken) {
+        return res.status(401).json({
+            success: false,
+            error: 'Invalid API token'
+        });
+    }
+    next();
+};
+// Применяем middleware ко всем API routes
+app.use('/api', authenticateApiToken);
 //default get route
 app.get('/', (req, res) => {
     res.send('TEST API AI BOT!!!');
@@ -244,6 +270,40 @@ app.get('/api/customer-info-token/:token', (req, res) => __awaiter(void 0, void 
     }
     catch (error) {
         console.error('Error in customer-info-token endpoint:', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Internal server error'
+        });
+    }
+}));
+// API для получения календаря клиента
+app.get('/api/customer-calendar', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { customerId, from, to } = req.query;
+        if (!customerId || !from || !to) {
+            return res.status(400).json({
+                success: false,
+                error: 'customerId, from and to parameters are required'
+            });
+        }
+        // Импортируем функцию прямо здесь
+        const { getCustomerCalendar } = yield Promise.resolve().then(() => __importStar(require('./bumesApi')));
+        const calendarData = yield getCustomerCalendar(customerId, from, to);
+        if (!calendarData.success) {
+            return res.status(500).json(calendarData);
+        }
+        res.json({
+            success: true,
+            parameters: {
+                customerId: customerId,
+                from: from,
+                to: to
+            },
+            data: calendarData.data
+        });
+    }
+    catch (error) {
+        console.error('Error in customer-calendar endpoint:', error);
         res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Internal server error'

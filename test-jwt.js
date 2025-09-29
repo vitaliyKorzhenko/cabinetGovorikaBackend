@@ -14,3 +14,5 @@ console.log('Сгенерированный токен:', token);
 
 const url = `https://example.com/callback?token=${token}`;
 console.log('Ссылка для фронта:', url);
+
+

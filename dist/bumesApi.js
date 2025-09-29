@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
+exports.getCustomerMeetings = exports.getCustomerCalendar = exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
 const apiReference_1 = require("./apiReference");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const MAIN_URL = 'https://main.okk24.com';
@@ -109,7 +109,6 @@ const getClientToken = (customerId, customerHash) => __awaiter(void 0, void 0, v
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = yield response.json();
-        console.log('Client token received:', data);
         return data;
     }
     catch (error) {
@@ -137,7 +136,6 @@ const getCustomerTariffs = (customerId, clientToken) => __awaiter(void 0, void 0
         const data = yield response.json();
         // Маппинг данных в формат Subscription с regular_lessons
         let tarrifData = data.data;
-        console.log('Customer tariffs received:', tarrifData);
         let mappedTariffs;
         if (tarrifData && Array.isArray(tarrifData)) {
             mappedTariffs = tarrifData.map((tariff) => ({
@@ -149,6 +147,9 @@ const getCustomerTariffs = (customerId, clientToken) => __awaiter(void 0, void 0
                 start_date: tariff.begin_date_c,
                 end_date: tariff.end_date_c,
                 is_active: tariff.is_active === 1,
+                custom_ind_period_limit: tariff.custom_ind_period_limit ? tariff.custom_ind_period_limit : 0,
+                is_expire_soon: tariff.is_expire_soon == '1' ? true : false,
+                tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
                 regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson) => ({
                     id: lesson.id,
                     alfa_customer_id: lesson.alfa_customer_id,
@@ -174,7 +175,6 @@ const getCustomerTariffs = (customerId, clientToken) => __awaiter(void 0, void 0
                     endLocalHuman: lesson.endLocalHuman
                 })) : [] // Расписание регулярных урок с нужными полями
             }));
-            console.log(`Mapped tariffs with schedule for customer ${customerId}:`, mappedTariffs);
             return mappedTariffs;
         }
         return mappedTariffs;
@@ -202,7 +202,6 @@ const getCustomerTariffSchedule = (tariffId, clientToken) => __awaiter(void 0, v
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = yield response.json();
-        console.log('Customer tariff schedule received:', data);
         return data;
     }
     catch (error) {
@@ -228,7 +227,6 @@ const getRegularLessonsSchedule = (customerId, clientToken) => __awaiter(void 0,
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = yield response.json();
-        console.log('Regular lessons schedule received:', data);
         return data;
     }
     catch (error) {
@@ -330,7 +328,6 @@ const getCustomerRegularLessons = (customerId, subjectId, clientToken) => __awai
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = yield response.json();
-        console.log(`Regular lessons for customer ${customerId}, subject ${subjectId}:`, data);
         return data;
     }
     catch (error) {
@@ -381,7 +378,6 @@ exports.getAvailableTariffs = getAvailableTariffs;
 const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Сначала получаем клиентский токен
-        console.log("====== START getCustomerInterfaceData ======");
         const tokenData = yield (0, exports.getClientToken)(customerId, customerHash);
         if (!tokenData || !tokenData.token) {
             throw new Error('Failed to get client token');
@@ -391,26 +387,42 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
         if (!lessonsData) {
             throw new Error('Failed to get customer data');
         }
-        console.log("====== lessonsData ======", lessonsData);
         // Извлекаем данные детей из массива уроков
         let parent = null;
+        //first lesson data log
         const children = yield Promise.all(lessonsData.map((lesson) => __awaiter(void 0, void 0, void 0, function* () {
+            // console.warn("====== lesson ======", lesson);
             const customer = lesson.customer;
             const teacher = lesson.teacher;
             // Получаем тарифы клиента с расписанием через API
             const customerTariffs = yield (0, exports.getCustomerTariffs)(customer.id.toString(), tokenData.token);
-            //console.log(`Customer tariffs with schedule for ${customer.name}:`, customerTariffs);
             // Получаем доступные тарифы для ученика
             const availableTariffs = yield (0, exports.getAvailableTariffs)(customer.id.toString());
+            // Получаем встречи клиента (используем индивидуальный c_hash каждого customer)
+            const customerSpecificHash = customer.c_hash || customerHash; // Fallback на общий hash если нет индивидуального
+            const meetingsData = yield (0, exports.getCustomerMeetings)(customer.id.toString(), customerSpecificHash);
+            // Обрабатываем данные встреч
+            let lastRecord = null;
+            let allRecords = [];
+            if (meetingsData && meetingsData.success !== false && meetingsData.meetings && Array.isArray(meetingsData.meetings)) {
+                allRecords = meetingsData.meetings;
+                // Берем последнюю запись (первую в массиве, если отсортированы по дате)
+                lastRecord = meetingsData.meetings.length > 0 ? meetingsData.meetings[0] : null;
+            }
             parent = {
                 id: customer.parent_id,
                 name: customer.kid_parent_name
             };
             return {
                 id: customer.id,
+                game_url: lesson.game_url,
                 name: customer.name,
                 email: customer.email,
                 phone: customer.phone,
+                c_hash: customer.c_hash,
+                customer_hash: customer.customer_hash,
+                custom_hash: customer.custom_hash,
+                calendar_hash: customer.calendar_hash,
                 birthday: customer.birthday,
                 real_timezone: customer.timezone,
                 timezone: customer.timezone,
@@ -420,7 +432,8 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
                 balance: customer.balance || 0,
                 environment: apiReference_1.Environment.GOVORIKA,
                 // available_subscriptions: availableTariffs, // Помещаем доступные тарифы
-                last_record: null,
+                last_record: lastRecord,
+                all_records: allRecords,
                 recommended_courses: null,
                 next_lesson: {
                     id: lesson.id,
@@ -471,7 +484,6 @@ const generateCustomerToken = (customerId_1, customerHash_1, ...args_1) => __awa
         const token = jsonwebtoken_1.default.sign(payload, secretKey);
         // Формируем URL для фронта
         const url = `https://example.com/callback?token=${token}`;
-        console.log("Ссылка для фронта:", url);
         return {
             success: true,
             token: token,
@@ -530,3 +542,70 @@ const getCustomerDataByToken = (token) => __awaiter(void 0, void 0, void 0, func
     }
 });
 exports.getCustomerDataByToken = getCustomerDataByToken;
+// Получение календаря клиента
+const getCustomerCalendar = (customerId, startDate, endDate) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const url = `${BASE_URL}/api2/alfa_calendars?customerId=${customerId}&from=${startDate}&to=${endDate}`;
+        const response = yield fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': 'da120237-3293-4017-a2d6-d5b31c873d38',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = yield response.json();
+        return {
+            success: true,
+            data: data
+        };
+    }
+    catch (error) {
+        console.error('Error getting customer calendar:', error);
+        return {
+            success: false,
+            error: 'Failed to get customer calendar'
+        };
+    }
+});
+exports.getCustomerCalendar = getCustomerCalendar;
+// Получение встреч клиента
+const getCustomerMeetings = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Сначала получаем клиентский токен
+        const tokenData = yield (0, exports.getClientToken)(customerId, customerHash);
+        if (!tokenData || !tokenData.token) {
+            return {
+                success: false,
+                error: 'Failed to get client token'
+            };
+        }
+        // Получаем встречи клиента
+        const response = yield fetch(`${BASE_URL}/govorikaalfa/api/customer/${customerId}/${customerHash}/meetings`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${tokenData.token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL,
+                'Referer': `${BASE_URL}/login`
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = yield response.json();
+        return data;
+    }
+    catch (error) {
+        console.error('Error getting customer meetings:', error);
+        return {
+            success: false,
+            error: 'Failed to get customer meetings'
+        };
+    }
+});
+exports.getCustomerMeetings = getCustomerMeetings;
