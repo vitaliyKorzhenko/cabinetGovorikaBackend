@@ -565,7 +565,7 @@ export const generateCustomerToken = async (
         const token = jwt.sign(payload, secretKey);
 
         // Формируем URL для фронта
-        const url = `https://example.com/callback?token=${token}`;
+        const url = `https://client.slideedu.com/callback?token=${token}`;
 
         return {
             success: true,

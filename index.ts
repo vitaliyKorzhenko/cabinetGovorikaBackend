@@ -219,6 +219,7 @@ app.get('/api/customer-regular-lessons/:customerId/:customerHash/:subjectId', as
 app.post('/api/generate-token', async (req, res) => {
   try {
     const { customerId, customerHash, env = "govorika" } = req.body;
+    console.warn("====== generate-token ======", req.body);
     
     if (!customerId || !customerHash) {
       return res.status(400).json({
