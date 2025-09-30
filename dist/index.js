@@ -263,6 +263,7 @@ app.get('/api/customer-info-token/:token', (req, res) => __awaiter(void 0, void 
         }
         // Импортируем функцию прямо здесь
         const { getCustomerDataByToken } = yield Promise.resolve().then(() => __importStar(require('./bumesApi')));
+        console.warn("====== getCustomerDataByToken ======", token);
         const customerData = yield getCustomerDataByToken(token);
         res.json({
             success: true,

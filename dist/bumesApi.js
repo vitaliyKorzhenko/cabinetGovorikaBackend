@@ -137,6 +137,7 @@ const getCustomerTariffs = (customerId, clientToken) => __awaiter(void 0, void 0
         // Маппинг данных в формат Subscription с regular_lessons
         let tarrifData = data.data;
         let mappedTariffs;
+        console.warn("====== tarrifData ======", tarrifData);
         if (tarrifData && Array.isArray(tarrifData)) {
             mappedTariffs = tarrifData.map((tariff) => ({
                 id: tariff.id,
@@ -146,7 +147,7 @@ const getCustomerTariffs = (customerId, clientToken) => __awaiter(void 0, void 0
                 duration: tariff.duration || 30, // По умолчанию 30 минут
                 start_date: tariff.begin_date_c,
                 end_date: tariff.end_date_c,
-                is_active: tariff.is_active === 1,
+                is_active: tariff.is_active,
                 custom_ind_period_limit: tariff.custom_ind_period_limit ? tariff.custom_ind_period_limit : 0,
                 is_expire_soon: tariff.is_expire_soon == '1' ? true : false,
                 tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
@@ -391,13 +392,14 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
         let parent = null;
         //first lesson data log
         const children = yield Promise.all(lessonsData.map((lesson) => __awaiter(void 0, void 0, void 0, function* () {
-            // console.warn("====== lesson ======", lesson);
+            //console.warn("====== lesson ======", lesson);
             const customer = lesson.customer;
             const teacher = lesson.teacher;
+            //console.warn("====== teacher ======", teacher);
+            // console.warn("====== customer ======", customer);
             // Получаем тарифы клиента с расписанием через API
             const customerTariffs = yield (0, exports.getCustomerTariffs)(customer.id.toString(), tokenData.token);
-            // Получаем доступные тарифы для ученика
-            const availableTariffs = yield (0, exports.getAvailableTariffs)(customer.id.toString());
+            //console.warn("====== customerTariffs ======", customerTariffs);
             // Получаем встречи клиента (используем индивидуальный c_hash каждого customer)
             const customerSpecificHash = customer.c_hash || customerHash; // Fallback на общий hash если нет индивидуального
             const meetingsData = yield (0, exports.getCustomerMeetings)(customer.id.toString(), customerSpecificHash);
@@ -442,8 +444,8 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
                     start_customer: lesson.start_customer,
                     start_customer_day: lesson.start_customer_day,
                     teacher: {
-                        id: teacher.id,
-                        name: teacher.name
+                        id: teacher ? teacher.id : null,
+                        name: teacher ? teacher.name : ''
                     },
                     zoom_link: lesson.web_join_url,
                     time_to: lesson.time_to,
@@ -533,6 +535,8 @@ const getCustomerDataByToken = (token) => __awaiter(void 0, void 0, void 0, func
             throw new Error(tokenData.error || 'Ошибка расшифровки токена');
         }
         const { clientId: customerId, hash: customerHash } = tokenData.data;
+        console.warn("====== customerId ======", customerId);
+        console.warn("====== customerHash ======", customerHash);
         // Получаем данные клиента используя существующую функцию
         return yield (0, exports.getCustomerInterfaceData)(customerId, customerHash);
     }

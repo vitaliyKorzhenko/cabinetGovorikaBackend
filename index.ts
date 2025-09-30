@@ -260,6 +260,7 @@ app.get('/api/customer-info-token/:token', async (req, res) => {
 
     // Импортируем функцию прямо здесь
     const { getCustomerDataByToken } = await import('./bumesApi');
+    console.warn("====== getCustomerDataByToken ======", token);
     const customerData = await getCustomerDataByToken(token);
     
     res.json({
