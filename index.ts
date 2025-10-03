@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { getLastLessons, getCustomerInterfaceData, getCustomerTariffs, getCustomerRegularLessons } from './bumesApi';
+import { getLastLessons, getCustomerInterfaceData, getCustomerTariffs, getCustomerRegularLessons, getClientTokenByAdmin, getLessonAvailableSlotsWithClientToken, updateLessonWithClientToken } from './bumesApi';
 
 
 // спсбио а дайте его логин пароль
@@ -299,6 +299,98 @@ app.get('/api/customer-calendar', async (req, res) => {
     res.json(calendarData);
   } catch (error) {
     console.error('Error in customer-calendar endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// API для получения свободных слотов урока с прямыми параметрами
+app.get('/api/lesson-available-slots/:lessonId/:customerId/:customerHash', async (req, res) => {
+  try {
+    const { lessonId, customerId, customerHash } = req.params;
+    
+    if (!lessonId || !customerId || !customerHash) {
+      return res.status(400).json({
+        success: false,
+        error: 'Lesson ID, Customer ID and Customer Hash are required'
+      });
+    }
+
+    console.warn("====== lesson-available-slots-direct ======", lessonId, customerId, customerHash);
+    
+    // Получаем клиентский токен через админский токен
+    const clientTokenResult = await getClientTokenByAdmin(customerId, customerHash);
+    if (!clientTokenResult.success || !clientTokenResult.data?.token) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to get client token'
+      });
+    }
+
+    const clientToken = clientTokenResult.data.token;
+
+    // Получаем свободные слоты для урока используя метод из bumesApi
+    const slotsData = await getLessonAvailableSlotsWithClientToken(lessonId, clientToken);
+    
+    if (!slotsData.success) {
+      return res.status(500).json(slotsData);
+    }
+
+    res.json(slotsData);
+  } catch (error) {
+    console.error('Error in lesson-available-slots-direct endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// API для обновления урока (изменение времени/даты)
+app.put('/api/update-lesson/:lessonId/:customerId/:customerHash', async (req, res) => {
+  try {
+    const { lessonId, customerId, customerHash } = req.params;
+    const lessonData = req.body;
+    
+    if (!lessonId || !customerId || !customerHash) {
+      return res.status(400).json({
+        success: false,
+        error: 'Lesson ID, Customer ID and Customer Hash are required'
+      });
+    }
+
+    if (!lessonData || Object.keys(lessonData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Lesson data is required in request body'
+      });
+    }
+
+    console.warn("====== update-lesson-direct ======", lessonId, customerId, customerHash, lessonData);
+    
+    // Получаем клиентский токен через админский токен
+    const clientTokenResult = await getClientTokenByAdmin(customerId, customerHash);
+    if (!clientTokenResult.success || !clientTokenResult.data?.token) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to get client token'
+      });
+    }
+
+    const clientToken = clientTokenResult.data.token;
+
+    // Обновляем урок используя метод из bumesApi
+    const updateResult = await updateLessonWithClientToken(lessonId, lessonData, clientToken);
+    
+    if (!updateResult.success) {
+      return res.status(500).json(updateResult);
+    }
+
+    res.json(updateResult);
+  } catch (error) {
+    console.error('Error in update-lesson-direct endpoint:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Internal server error'

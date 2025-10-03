@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCustomerMeetings = exports.getCustomerCalendar = exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
+exports.updateLessonWithClientToken = exports.getLessonAvailableSlotsWithClientToken = exports.getClientTokenByAdmin = exports.getCustomerMeetings = exports.getCustomerCalendar = exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
 const apiReference_1 = require("./apiReference");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const MAIN_URL = 'https://main.okk24.com';
@@ -534,6 +534,7 @@ const getCustomerDataByToken = (token) => __awaiter(void 0, void 0, void 0, func
         if (!tokenData.success || !tokenData.data) {
             throw new Error(tokenData.error || 'Ошибка расшифровки токена');
         }
+        console.warn("====== tokenData ======", tokenData);
         const { clientId: customerId, hash: customerHash } = tokenData.data;
         console.warn("====== customerId ======", customerId);
         console.warn("====== customerHash ======", customerHash);
@@ -611,3 +612,112 @@ const getCustomerMeetings = (customerId, customerHash) => __awaiter(void 0, void
     }
 });
 exports.getCustomerMeetings = getCustomerMeetings;
+// Получение клиентского токена через админский токен
+const getClientTokenByAdmin = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Сначала получаем админский токен
+        const adminLoginResponse = yield (0, exports.loginToAdminPanel)();
+        if (!adminLoginResponse.success) {
+            return {
+                success: false,
+                error: 'Failed to get admin token'
+            };
+        }
+        const adminToken = (0, exports.getCurrentToken)();
+        if (!adminToken) {
+            return {
+                success: false,
+                error: 'Admin token not available'
+            };
+        }
+        // Получаем клиентский токен используя админский токен
+        const response = yield fetch(`${BASE_URL}/govorikaalfa/api/login/${customerId}/${customerHash}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${adminToken.token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = yield response.json();
+        return {
+            success: true,
+            data: data
+        };
+    }
+    catch (error) {
+        console.error('Error getting client token by admin:', error);
+        return {
+            success: false,
+            error: 'Failed to get client token'
+        };
+    }
+});
+exports.getClientTokenByAdmin = getClientTokenByAdmin;
+// Получение свободных слотов для переноса урока с клиентским токеном
+const getLessonAvailableSlotsWithClientToken = (lessonId, clientToken) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Получаем свободные слоты для урока используя клиентский токен
+        const response = yield fetch(`${BASE_URL}/govorikaalfa/api/last_lesson/${lessonId}/next_times`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = yield response.json();
+        return {
+            success: true,
+            data: data
+        };
+    }
+    catch (error) {
+        console.error('Error getting lesson available slots with client token:', error);
+        return {
+            success: false,
+            error: 'Failed to get lesson available slots'
+        };
+    }
+});
+exports.getLessonAvailableSlotsWithClientToken = getLessonAvailableSlotsWithClientToken;
+// Обновление урока (изменение времени/даты) с клиентским токеном
+const updateLessonWithClientToken = (lessonId, lessonData, clientToken) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Обновляем урок используя клиентский токен
+        const response = yield fetch(`${BASE_URL}/govorikaalfa/api/last_lesson/${lessonId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL
+            },
+            body: JSON.stringify(lessonData)
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = yield response.json();
+        return {
+            success: true,
+            data: data
+        };
+    }
+    catch (error) {
+        console.error('Error updating lesson with client token:', error);
+        return {
+            success: false,
+            error: 'Failed to update lesson'
+        };
+    }
+});
+exports.updateLessonWithClientToken = updateLessonWithClientToken;

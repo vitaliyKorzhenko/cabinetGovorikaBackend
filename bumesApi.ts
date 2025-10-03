@@ -617,7 +617,7 @@ export const getCustomerDataByToken = async (token: string): Promise<ClientRespo
         if (!tokenData.success || !tokenData.data) {
             throw new Error(tokenData.error || 'Ошибка расшифровки токена');
         }
-
+        console.warn("====== tokenData ======", tokenData);
         const { clientId: customerId, hash: customerHash } = tokenData.data;
 
         console.warn("====== customerId ======", customerId);
@@ -698,6 +698,120 @@ export const getCustomerMeetings = async (customerId: string, customerHash: stri
         return {
             success: false,
             error: 'Failed to get customer meetings'
+        };
+    }
+}
+
+// Получение клиентского токена через админский токен
+export const getClientTokenByAdmin = async (customerId: string, customerHash: string): Promise<any> => {
+    try {
+        // Сначала получаем админский токен
+        const adminLoginResponse = await loginToAdminPanel();
+        if (!adminLoginResponse.success) {
+            return {
+                success: false,
+                error: 'Failed to get admin token'
+            };
+        }
+
+        const adminToken = getCurrentToken();
+        if (!adminToken) {
+            return {
+                success: false,
+                error: 'Admin token not available'
+            };
+        }
+
+        // Получаем клиентский токен используя админский токен
+        const response = await fetch(`${BASE_URL}/govorikaalfa/api/login/${customerId}/${customerHash}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${adminToken.token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return {
+            success: true,
+            data: data
+        };
+    } catch (error) {
+        console.error('Error getting client token by admin:', error);
+        return {
+            success: false,
+            error: 'Failed to get client token'
+        };
+    }
+}
+
+// Получение свободных слотов для переноса урока с клиентским токеном
+export const getLessonAvailableSlotsWithClientToken = async (lessonId: string, clientToken: string): Promise<any> => {
+    try {
+        // Получаем свободные слоты для урока используя клиентский токен
+        const response = await fetch(`${BASE_URL}/govorikaalfa/api/last_lesson/${lessonId}/next_times`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return {
+            success: true,
+            data: data
+        };
+    } catch (error) {
+        console.error('Error getting lesson available slots with client token:', error);
+        return {
+            success: false,
+            error: 'Failed to get lesson available slots'
+        };
+    }
+}
+
+// Обновление урока (изменение времени/даты) с клиентским токеном
+export const updateLessonWithClientToken = async (lessonId: string, lessonData: any, clientToken: string): Promise<any> => {
+    try {
+        // Обновляем урок используя клиентский токен
+        const response = await fetch(`${BASE_URL}/govorikaalfa/api/last_lesson/${lessonId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': BASE_URL
+            },
+            body: JSON.stringify(lessonData)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return {
+            success: true,
+            data: data
+        };
+    } catch (error) {
+        console.error('Error updating lesson with client token:', error);
+        return {
+            success: false,
+            error: 'Failed to update lesson'
         };
     }
 }
