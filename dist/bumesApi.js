@@ -12,15 +12,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateLessonWithClientToken = exports.getLessonAvailableSlotsWithClientToken = exports.getClientTokenByAdmin = exports.getCustomerMeetings = exports.getCustomerCalendar = exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
+exports.updateLessonWithClientToken = exports.getLessonAvailableSlotsWithClientToken = exports.getClientTokenByAdmin = exports.getCustomerMeetings = exports.countLessonsCustomerCalendar = exports.getCustomerCalendar = exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
+const apiConfig_1 = require("./apiConfig");
 const apiReference_1 = require("./apiReference");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const MAIN_URL = 'https://main.okk24.com';
-const BASE_URL = MAIN_URL;
-// Константы для авторизации
-const ADMIN_EMAIL = 'aleks.evdokimov+ai-bot-lid-dogim@gmail.com';
-const ADMIN_PASSWORD = '1234567';
-const triggerWebhookUrl = 'https://govorikavitaliydev.app.n8n.cloud/webhook/govorikaLead';
 let currentToken = null;
 let credentials = null;
 const setCredentials = (email, password) => {
@@ -39,19 +34,19 @@ const clearToken = () => {
     currentToken = null;
 };
 exports.clearToken = clearToken;
-const loginToAdminPanel = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (email = ADMIN_EMAIL, password = ADMIN_PASSWORD) {
+const loginToAdminPanel = (apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const response = yield fetch(`${BASE_URL}/api/login`, {
+        const response = yield fetch(`${apiConfig.url}/api/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             },
             body: JSON.stringify({
-                email,
-                password
+                email: apiConfig.email,
+                password: apiConfig.password
             })
         });
         const data = yield response.json();
@@ -66,7 +61,7 @@ const loginToAdminPanel = (...args_1) => __awaiter(void 0, [...args_1], void 0, 
             token_type: data.token_type,
             expires_in: data.expires_in
         });
-        (0, exports.setCredentials)(ADMIN_EMAIL, ADMIN_PASSWORD);
+        (0, exports.setCredentials)(apiConfig.email, apiConfig.password);
         return {
             success: true,
             data
@@ -83,10 +78,10 @@ const loginToAdminPanel = (...args_1) => __awaiter(void 0, [...args_1], void 0, 
 exports.loginToAdminPanel = loginToAdminPanel;
 // https://main.okk24.com/bumess/api/task/get
 // Получение клиентского токена
-const getClientToken = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
+const getClientToken = (customerId, customerHash, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Сначала получаем админский токен
-        const adminLoginResponse = yield (0, exports.loginToAdminPanel)();
+        const adminLoginResponse = yield (0, exports.loginToAdminPanel)(apiConfig);
         if (!adminLoginResponse.success) {
             return null;
         }
@@ -95,14 +90,14 @@ const getClientToken = (customerId, customerHash) => __awaiter(void 0, void 0, v
             return null;
         }
         // Получаем клиентский токен используя админский токен
-        const response = yield fetch(`${BASE_URL}/govorikaalfa/api/login/${customerId}/${customerHash}`, {
+        const response = yield fetch(`${apiConfig.url}/govorikaalfa/api/login/${customerId}/${customerHash}`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${adminToken.token}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
         if (!response.ok) {
@@ -118,16 +113,16 @@ const getClientToken = (customerId, customerHash) => __awaiter(void 0, void 0, v
 });
 exports.getClientToken = getClientToken;
 // Получение тарифов клиента
-const getCustomerTariffs = (customerId, clientToken) => __awaiter(void 0, void 0, void 0, function* () {
+const getCustomerTariffs = (customerId, clientToken, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const response = yield fetch(`${BASE_URL}/api/customer_tariff_customer/all/${customerId}`, {
+        const response = yield fetch(`${apiConfig.url}/api/customer_tariff_customer/all/${customerId}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
         if (!response.ok) {
@@ -137,48 +132,66 @@ const getCustomerTariffs = (customerId, clientToken) => __awaiter(void 0, void 0
         // Маппинг данных в формат Subscription с regular_lessons
         let tarrifData = data.data;
         let mappedTariffs;
-        console.warn("====== tarrifData ======", tarrifData);
         if (tarrifData && Array.isArray(tarrifData)) {
-            mappedTariffs = tarrifData.map((tariff) => ({
-                id: tariff.id,
-                type: tariff.type,
-                name: tariff.name,
-                price: tariff.price,
-                duration: tariff.duration || 30, // По умолчанию 30 минут
-                start_date: tariff.begin_date_c,
-                end_date: tariff.end_date_c,
-                is_active: tariff.is_active,
-                custom_ind_period_limit: tariff.custom_ind_period_limit ? tariff.custom_ind_period_limit : 0,
-                is_expire_soon: tariff.is_expire_soon == '1' ? true : false,
-                tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
-                regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson) => ({
-                    id: lesson.id,
-                    alfa_customer_id: lesson.alfa_customer_id,
-                    lesson_type_id: lesson.lesson_type_id,
-                    subject_id: lesson.subject_id,
-                    day: lesson.day,
-                    teacher_id: lesson.teacher_id,
-                    external_id: lesson.external_id,
-                    b_date: lesson.b_date,
-                    e_date: lesson.e_date,
-                    time_from: lesson.time_from,
-                    time_to: lesson.time_to,
-                    created_at: lesson.created_at,
-                    updated_at: lesson.updated_at,
-                    is_active: lesson.is_active,
-                    need_prolong: lesson.need_prolong,
-                    parent_id: lesson.parent_id,
-                    created_by: lesson.created_by,
-                    expired: lesson.expired,
-                    customerString: lesson.customerString,
-                    adminString: lesson.adminString,
-                    beginLocalHuman: lesson.beginLocalHuman,
-                    endLocalHuman: lesson.endLocalHuman
-                })) : [] // Расписание регулярных урок с нужными полями
-            }));
+            // Получаем текущую дату в формате 2025-09-01T00:00:00
+            const today = new Date().toISOString().split('.')[0]; // Формат: 2025-09-01T00:00:00
+            mappedTariffs = yield Promise.all(tarrifData.map((tariff) => __awaiter(void 0, void 0, void 0, function* () {
+                // Считаем уроки от начала тарифа до сегодня
+                const lessons = yield (0, exports.getCustomerCalendar)(customerId, tariff.begin_date_c, today, apiConfig);
+                console.log('===== from ======', tariff.begin_date_c);
+                console.log('===== to ======', today);
+                console.log('===== lessonsCount ======', lessons[0]);
+                let countFinishedLessons = 0;
+                if (lessons && lessons.length > 0) {
+                    for (let lesson of lessons) {
+                        if (lesson.status == 3 && !lesson.reason_id) {
+                            countFinishedLessons++;
+                        }
+                    }
+                }
+                let custom_ind_period_limit = tariff.custom_ind_period_limit ? tariff.custom_ind_period_limit : 0;
+                return {
+                    id: tariff.id,
+                    type: tariff.type,
+                    name: tariff.name,
+                    price: tariff.price,
+                    duration: tariff.duration || 30, // По умолчанию 30 минут
+                    start_date: tariff.begin_date_c,
+                    end_date: tariff.end_date_c,
+                    is_active: tariff.is_active,
+                    custom_ind_period_limit: custom_ind_period_limit,
+                    is_expire_soon: tariff.is_expire_soon == '1' ? true : false,
+                    tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
+                    countFinishedLessons: countFinishedLessons,
+                    countNewLessons: custom_ind_period_limit - countFinishedLessons,
+                    regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson) => ({
+                        id: lesson.id,
+                        alfa_customer_id: lesson.alfa_customer_id,
+                        lesson_type_id: lesson.lesson_type_id,
+                        subject_id: lesson.subject_id,
+                        day: lesson.day,
+                        teacher_id: lesson.teacher_id,
+                        external_id: lesson.external_id,
+                        b_date: lesson.b_date,
+                        e_date: lesson.e_date,
+                        time_from: lesson.time_from,
+                        time_to: lesson.time_to,
+                        created_at: lesson.created_at,
+                        updated_at: lesson.updated_at,
+                        is_active: lesson.is_active,
+                        need_prolong: lesson.need_prolong,
+                        parent_id: lesson.parent_id,
+                        created_by: lesson.created_by,
+                        expired: lesson.expired,
+                        customerString: lesson.customerString,
+                        adminString: lesson.adminString,
+                        beginLocalHuman: lesson.beginLocalHuman,
+                        endLocalHuman: lesson.endLocalHuman
+                    })) : [] // Расписание регулярных урок с нужными полями
+                };
+            })));
             return mappedTariffs;
         }
-        return mappedTariffs;
     }
     catch (error) {
         console.error('Error getting customer tariffs:', error);
@@ -187,16 +200,16 @@ const getCustomerTariffs = (customerId, clientToken) => __awaiter(void 0, void 0
 });
 exports.getCustomerTariffs = getCustomerTariffs;
 // Получение расписания тарифа клиента
-const getCustomerTariffSchedule = (tariffId, clientToken) => __awaiter(void 0, void 0, void 0, function* () {
+const getCustomerTariffSchedule = (tariffId, clientToken, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const response = yield fetch(`${BASE_URL}/api/customer_tariff/${tariffId}/schedule`, {
+        const response = yield fetch(`${apiConfig.url}/api/customer_tariff/${tariffId}/schedule`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
         if (!response.ok) {
@@ -212,16 +225,16 @@ const getCustomerTariffSchedule = (tariffId, clientToken) => __awaiter(void 0, v
 });
 exports.getCustomerTariffSchedule = getCustomerTariffSchedule;
 // Получение расписания регулярных уроков клиента
-const getRegularLessonsSchedule = (customerId, clientToken) => __awaiter(void 0, void 0, void 0, function* () {
+const getRegularLessonsSchedule = (customerId, clientToken, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const response = yield fetch(`${BASE_URL}/api/regular_lessons/schedule/${customerId}`, {
+        const response = yield fetch(`${apiConfig.url}/api/regular_lessons/schedule/${customerId}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
         if (!response.ok) {
@@ -237,10 +250,10 @@ const getRegularLessonsSchedule = (customerId, clientToken) => __awaiter(void 0,
 });
 exports.getRegularLessonsSchedule = getRegularLessonsSchedule;
 // Получение последних уроков
-const getLastLessons = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
+const getLastLessons = (customerId, customerHash, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Сначала получаем клиентский токен
-        const tokenData = yield (0, exports.getClientToken)(customerId, customerHash);
+        const tokenData = yield (0, exports.getClientToken)(customerId, customerHash, apiConfig);
         if (!tokenData || !tokenData.token) {
             return {
                 success: false,
@@ -248,14 +261,14 @@ const getLastLessons = (customerId, customerHash) => __awaiter(void 0, void 0, v
             };
         }
         // Получаем последние уроки используя клиентский токен
-        const response = yield fetch(`${BASE_URL}/govorikaalfa/api/last_lessons`, {
+        const response = yield fetch(`${apiConfig.url}/govorikaalfa/api/last_lessons`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${tokenData.token}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
         if (!response.ok) {
@@ -271,10 +284,10 @@ const getLastLessons = (customerId, customerHash) => __awaiter(void 0, void 0, v
 });
 exports.getLastLessons = getLastLessons;
 // Комбинированная функция для получения токена и тарифов
-const getCustomerData = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
+const getCustomerData = (customerId, customerHash, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Сначала получаем клиентский токен
-        const tokenData = yield (0, exports.getClientToken)(customerId, customerHash);
+        const tokenData = yield (0, exports.getClientToken)(customerId, customerHash, apiConfig);
         if (!tokenData || !tokenData.token) {
             return {
                 success: false,
@@ -282,7 +295,7 @@ const getCustomerData = (customerId, customerHash) => __awaiter(void 0, void 0, 
             };
         }
         // Затем получаем тарифы клиента
-        const tariffsData = yield (0, exports.getCustomerTariffs)(customerId, tokenData.token);
+        const tariffsData = yield (0, exports.getCustomerTariffs)(customerId, tokenData.token, apiConfig);
         if (!tariffsData) {
             return {
                 success: false,
@@ -304,16 +317,16 @@ const getCustomerData = (customerId, customerHash) => __awaiter(void 0, void 0, 
 });
 exports.getCustomerData = getCustomerData;
 // Получение регулярных уроков клиента по предмету
-const getCustomerRegularLessons = (customerId, subjectId, clientToken) => __awaiter(void 0, void 0, void 0, function* () {
+const getCustomerRegularLessons = (customerId, subjectId, clientToken, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let url;
         if (subjectId === 0) {
             // Если subjectId = 0, получаем все предметы
-            url = `${BASE_URL}/api/customer_regular_lessons/${customerId}`;
+            url = `${apiConfig.url}/api/customer_regular_lessons/${customerId}`;
         }
         else {
             // Если указан конкретный предмет
-            url = `${BASE_URL}/api/customer_regular_lessons/${customerId}/${subjectId}`;
+            url = `${apiConfig.url}/api/customer_regular_lessons/${customerId}/${subjectId}`;
         }
         const response = yield fetch(url, {
             method: 'GET',
@@ -321,8 +334,8 @@ const getCustomerRegularLessons = (customerId, subjectId, clientToken) => __awai
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig}/login`
             }
         });
         if (!response.ok) {
@@ -338,15 +351,15 @@ const getCustomerRegularLessons = (customerId, subjectId, clientToken) => __awai
 });
 exports.getCustomerRegularLessons = getCustomerRegularLessons;
 // Получение доступных тарифов для клиента
-const getAvailableTariffs = (customerId) => __awaiter(void 0, void 0, void 0, function* () {
+const getAvailableTariffs = (customerId, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const response = yield fetch(`${BASE_URL}/api/tariff?customer_id=${customerId}`, {
+        const response = yield fetch(`${apiConfig.url}/api/tariff?customer_id=${customerId}`, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
         if (!response.ok) {
@@ -376,15 +389,15 @@ const getAvailableTariffs = (customerId) => __awaiter(void 0, void 0, void 0, fu
 });
 exports.getAvailableTariffs = getAvailableTariffs;
 // Получение структурированных данных клиента для интерфейса
-const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
+const getCustomerInterfaceData = (customerId, customerHash, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Сначала получаем клиентский токен
-        const tokenData = yield (0, exports.getClientToken)(customerId, customerHash);
+        const tokenData = yield (0, exports.getClientToken)(customerId, customerHash, apiConfig);
         if (!tokenData || !tokenData.token) {
             throw new Error('Failed to get client token');
         }
         // Получаем данные клиента и уроков
-        const lessonsData = yield (0, exports.getLastLessons)(customerId, customerHash);
+        const lessonsData = yield (0, exports.getLastLessons)(customerId, customerHash, apiConfig);
         if (!lessonsData) {
             throw new Error('Failed to get customer data');
         }
@@ -398,11 +411,11 @@ const getCustomerInterfaceData = (customerId, customerHash) => __awaiter(void 0,
             //console.warn("====== teacher ======", teacher);
             // console.warn("====== customer ======", customer);
             // Получаем тарифы клиента с расписанием через API
-            const customerTariffs = yield (0, exports.getCustomerTariffs)(customer.id.toString(), tokenData.token);
+            const customerTariffs = yield (0, exports.getCustomerTariffs)(customer.id.toString(), tokenData.token, apiConfig);
             //console.warn("====== customerTariffs ======", customerTariffs);
             // Получаем встречи клиента (используем индивидуальный c_hash каждого customer)
             const customerSpecificHash = customer.c_hash || customerHash; // Fallback на общий hash если нет индивидуального
-            const meetingsData = yield (0, exports.getCustomerMeetings)(customer.id.toString(), customerSpecificHash);
+            const meetingsData = yield (0, exports.getCustomerMeetings)(customer.id.toString(), customerSpecificHash, apiConfig);
             // Обрабатываем данные встреч
             let lastRecord = null;
             let allRecords = [];
@@ -528,18 +541,24 @@ const decodeCustomerToken = (token) => {
 exports.decodeCustomerToken = decodeCustomerToken;
 // Получение данных клиента по JWT токену
 const getCustomerDataByToken = (token) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         // Расшифровываем токен
         const tokenData = (0, exports.decodeCustomerToken)(token);
+        console.warn("====== DECODE tokenData ======", tokenData);
+        let env = ((_a = tokenData === null || tokenData === void 0 ? void 0 : tokenData.data) === null || _a === void 0 ? void 0 : _a.env) || '';
+        console.warn("====== env ======", env);
+        let apiConfig = (0, apiConfig_1.getAdminConfig)(env);
+        console.warn("====== apiConfig ======", apiConfig);
         if (!tokenData.success || !tokenData.data) {
-            throw new Error(tokenData.error || 'Ошибка расшифровки токена');
+            throw new Error(tokenData.error || 'Failed to decode token');
         }
         console.warn("====== tokenData ======", tokenData);
         const { clientId: customerId, hash: customerHash } = tokenData.data;
         console.warn("====== customerId ======", customerId);
         console.warn("====== customerHash ======", customerHash);
         // Получаем данные клиента используя существующую функцию
-        return yield (0, exports.getCustomerInterfaceData)(customerId, customerHash);
+        return yield (0, exports.getCustomerInterfaceData)(customerId, customerHash, apiConfig);
     }
     catch (error) {
         console.error('Error getting customer data by token:', error);
@@ -548,9 +567,9 @@ const getCustomerDataByToken = (token) => __awaiter(void 0, void 0, void 0, func
 });
 exports.getCustomerDataByToken = getCustomerDataByToken;
 // Получение календаря клиента
-const getCustomerCalendar = (customerId, startDate, endDate) => __awaiter(void 0, void 0, void 0, function* () {
+const getCustomerCalendar = (customerId, startDate, endDate, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const url = `${BASE_URL}/api2/alfa_calendars?customerId=${customerId}&from=${startDate}&to=${endDate}`;
+        const url = `${apiConfig.url}/api2/alfa_calendars?customerId=${customerId}&from=${startDate}&to=${endDate}`;
         const response = yield fetch(url, {
             method: 'GET',
             headers: {
@@ -575,11 +594,39 @@ const getCustomerCalendar = (customerId, startDate, endDate) => __awaiter(void 0
     }
 });
 exports.getCustomerCalendar = getCustomerCalendar;
+const countLessonsCustomerCalendar = (customerId, startDate, endDate, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const url = `${apiConfig.url}/api2/alfa_calendars?customerId=${customerId}&from=${startDate}&to=${endDate}`;
+        const response = yield fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': 'da120237-3293-4017-a2d6-d5b31c873d38',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = yield response.json();
+        console.warn("====== data ======", data);
+        console.warn("=====LESSONS COUNT ======");
+        return data;
+    }
+    catch (error) {
+        console.error('Error getting customer calendar:', error);
+        return {
+            success: false,
+            error: 'Failed to get customer calendar'
+        };
+    }
+});
+exports.countLessonsCustomerCalendar = countLessonsCustomerCalendar;
 // Получение встреч клиента
-const getCustomerMeetings = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
+const getCustomerMeetings = (customerId, customerHash, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Сначала получаем клиентский токен
-        const tokenData = yield (0, exports.getClientToken)(customerId, customerHash);
+        const tokenData = yield (0, exports.getClientToken)(customerId, customerHash, apiConfig);
         if (!tokenData || !tokenData.token) {
             return {
                 success: false,
@@ -587,14 +634,14 @@ const getCustomerMeetings = (customerId, customerHash) => __awaiter(void 0, void
             };
         }
         // Получаем встречи клиента
-        const response = yield fetch(`${BASE_URL}/govorikaalfa/api/customer/${customerId}/${customerHash}/meetings`, {
+        const response = yield fetch(`${apiConfig.url}/govorikaalfa/api/customer/${customerId}/${customerHash}/meetings`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${tokenData.token}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
         if (!response.ok) {
@@ -613,10 +660,10 @@ const getCustomerMeetings = (customerId, customerHash) => __awaiter(void 0, void
 });
 exports.getCustomerMeetings = getCustomerMeetings;
 // Получение клиентского токена через админский токен
-const getClientTokenByAdmin = (customerId, customerHash) => __awaiter(void 0, void 0, void 0, function* () {
+const getClientTokenByAdmin = (customerId, customerHash, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Сначала получаем админский токен
-        const adminLoginResponse = yield (0, exports.loginToAdminPanel)();
+        const adminLoginResponse = yield (0, exports.loginToAdminPanel)(apiConfig);
         if (!adminLoginResponse.success) {
             return {
                 success: false,
@@ -631,13 +678,13 @@ const getClientTokenByAdmin = (customerId, customerHash) => __awaiter(void 0, vo
             };
         }
         // Получаем клиентский токен используя админский токен
-        const response = yield fetch(`${BASE_URL}/govorikaalfa/api/login/${customerId}/${customerHash}`, {
+        const response = yield fetch(`${apiConfig.url}/govorikaalfa/api/login/${customerId}/${customerHash}`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${adminToken.token}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL
+                'Origin': apiConfig.url
             }
         });
         if (!response.ok) {
@@ -659,16 +706,16 @@ const getClientTokenByAdmin = (customerId, customerHash) => __awaiter(void 0, vo
 });
 exports.getClientTokenByAdmin = getClientTokenByAdmin;
 // Получение свободных слотов для переноса урока с клиентским токеном
-const getLessonAvailableSlotsWithClientToken = (lessonId, clientToken) => __awaiter(void 0, void 0, void 0, function* () {
+const getLessonAvailableSlotsWithClientToken = (lessonId, clientToken, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Получаем свободные слоты для урока используя клиентский токен
-        const response = yield fetch(`${BASE_URL}/govorikaalfa/api/last_lesson/${lessonId}/next_times`, {
+        const response = yield fetch(`${apiConfig.url}/govorikaalfa/api/last_lesson/${lessonId}/next_times`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL
+                'Origin': apiConfig.url
             }
         });
         if (!response.ok) {
@@ -690,16 +737,16 @@ const getLessonAvailableSlotsWithClientToken = (lessonId, clientToken) => __awai
 });
 exports.getLessonAvailableSlotsWithClientToken = getLessonAvailableSlotsWithClientToken;
 // Обновление урока (изменение времени/даты) с клиентским токеном
-const updateLessonWithClientToken = (lessonId, lessonData, clientToken) => __awaiter(void 0, void 0, void 0, function* () {
+const updateLessonWithClientToken = (lessonId, lessonData, clientToken, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Обновляем урок используя клиентский токен
-        const response = yield fetch(`${BASE_URL}/govorikaalfa/api/last_lesson/${lessonId}`, {
+        const response = yield fetch(`${apiConfig.url}/govorikaalfa/api/last_lesson/${lessonId}`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL
+                'Origin': apiConfig.url
             },
             body: JSON.stringify(lessonData)
         });

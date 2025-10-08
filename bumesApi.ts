@@ -1,16 +1,6 @@
+import { AdminConfig, getAdminConfig } from "./apiConfig";
 import ClientResponse, { Child, Environment, Parent, Role, Tariff } from "./apiReference";
 import jwt from "jsonwebtoken";
-
-const MAIN_URL =  'https://main.okk24.com';
-
-const BASE_URL = MAIN_URL;
-
-// Константы для авторизации
-const ADMIN_EMAIL = 'aleks.evdokimov+ai-bot-lid-dogim@gmail.com';
-const ADMIN_PASSWORD = '1234567';
-
-const triggerWebhookUrl = 'https://govorikavitaliydev.app.n8n.cloud/webhook/govorikaLead';
-
 
 interface TokenData {
     token: string;
@@ -58,25 +48,24 @@ export const clearToken = (): void => {
 
 
 export const loginToAdminPanel = async (
-    email: string = ADMIN_EMAIL,
-    password: string = ADMIN_PASSWORD
+   apiConfig: AdminConfig
 ): Promise<{
     success: boolean;
     data?: any;
     error?: string;
 }> => {
     try {
-        const response = await fetch(`${BASE_URL}/api/login`, {
+        const response = await fetch(`${apiConfig.url}/api/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             },
             body: JSON.stringify({
-                email,
-                password
+                email: apiConfig.email,
+                password: apiConfig.password
             })
         });
 
@@ -94,7 +83,7 @@ export const loginToAdminPanel = async (
             token_type: data.token_type,
             expires_in: data.expires_in
         });
-        setCredentials(ADMIN_EMAIL, ADMIN_PASSWORD);
+        setCredentials(apiConfig.email, apiConfig.password);
 
         return {
             success: true,
@@ -120,10 +109,10 @@ export const loginToAdminPanel = async (
 
 
 // Получение клиентского токена
-export const getClientToken = async (customerId: string, customerHash: string): Promise<any> => {
+export const getClientToken = async (customerId: string, customerHash: string, apiConfig: AdminConfig): Promise<any> => {
     try {
         // Сначала получаем админский токен
-        const adminLoginResponse = await loginToAdminPanel();
+        const adminLoginResponse = await loginToAdminPanel(apiConfig);
         if (!adminLoginResponse.success) {
             return null;
         }
@@ -134,14 +123,14 @@ export const getClientToken = async (customerId: string, customerHash: string): 
         }
 
         // Получаем клиентский токен используя админский токен
-        const response = await fetch(`${BASE_URL}/govorikaalfa/api/login/${customerId}/${customerHash}`, {
+        const response = await fetch(`${apiConfig.url}/govorikaalfa/api/login/${customerId}/${customerHash}`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${adminToken.token}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
 
@@ -158,16 +147,16 @@ export const getClientToken = async (customerId: string, customerHash: string): 
 }
 
 // Получение тарифов клиента
-export const getCustomerTariffs = async (customerId: string, clientToken: string): Promise<any> => {
+export const getCustomerTariffs = async (customerId: string, clientToken: string, apiConfig: AdminConfig): Promise<any> => {
     try {
-        const response = await fetch(`${BASE_URL}/api/customer_tariff_customer/all/${customerId}`, {
+        const response = await fetch(`${apiConfig.url}/api/customer_tariff_customer/all/${customerId}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
 
@@ -181,49 +170,74 @@ export const getCustomerTariffs = async (customerId: string, clientToken: string
         // Маппинг данных в формат Subscription с regular_lessons
         let tarrifData = data.data;
         let  mappedTariffs;
-        console.warn("====== tarrifData ======", tarrifData);
         if ( tarrifData && Array.isArray(tarrifData)) {
-            mappedTariffs = tarrifData.map((tariff: any) => ({
-                id: tariff.id,
-                type: tariff.type,
-                name: tariff.name,
-                price: tariff.price,
-                duration: tariff.duration || 30, // По умолчанию 30 минут
-                start_date: tariff.begin_date_c,
-                end_date: tariff.end_date_c,
-                is_active: tariff.is_active,
-                custom_ind_period_limit: tariff.custom_ind_period_limit ? tariff.custom_ind_period_limit : 0,
-                is_expire_soon: tariff.is_expire_soon == '1' ? true : false,
-                tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
-                regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson: any) => ({
-                    id: lesson.id,
-                    alfa_customer_id: lesson.alfa_customer_id,
-                    lesson_type_id: lesson.lesson_type_id,
-                    subject_id: lesson.subject_id,
-                    day: lesson.day,
-                    teacher_id: lesson.teacher_id,
-                    external_id: lesson.external_id,
-                    b_date: lesson.b_date,
-                    e_date: lesson.e_date,
-                    time_from: lesson.time_from,
-                    time_to: lesson.time_to,
-                    created_at: lesson.created_at,
-                    updated_at: lesson.updated_at,
-                    is_active: lesson.is_active,
-                    need_prolong: lesson.need_prolong,
-                    parent_id: lesson.parent_id,
-                    created_by: lesson.created_by,
-                    expired: lesson.expired,
-                    customerString: lesson.customerString,
-                    adminString: lesson.adminString,
-                    beginLocalHuman: lesson.beginLocalHuman,
-                    endLocalHuman: lesson.endLocalHuman
-                })) : [] // Расписание регулярных урок с нужными полями
-            }));
+            // Получаем текущую дату в формате 2025-09-01T00:00:00
+            const today = new Date().toISOString().split('.')[0]; // Формат: 2025-09-01T00:00:00
             
+            mappedTariffs = await Promise.all(tarrifData.map(async (tariff: any) => {
+                // Считаем уроки от начала тарифа до сегодня
+                const lessons = await getCustomerCalendar(
+                    customerId,
+                    tariff.begin_date_c,
+                    today,
+                    apiConfig
+                );
+                console.log('===== from ======', tariff.begin_date_c);
+                console.log('===== to ======', today);
+                console.log('===== lessonsCount ======', lessons[0]);
+                let countFinishedLessons = 0;
+                if (lessons && lessons.length > 0) {
+                    for (let lesson of lessons) {
+                        if (lesson.status == 3 && !lesson.reason_id) {
+                            countFinishedLessons++;
+                        }
+                    }
+                }
+                let custom_ind_period_limit = tariff.custom_ind_period_limit ? tariff.custom_ind_period_limit : 0;
+                return {
+                    id: tariff.id,
+                    type: tariff.type,
+                    name: tariff.name,
+                    price: tariff.price,
+                    duration: tariff.duration || 30, // По умолчанию 30 минут
+                    start_date: tariff.begin_date_c,
+                    end_date: tariff.end_date_c,
+                    is_active: tariff.is_active,
+                    custom_ind_period_limit: custom_ind_period_limit,
+                    is_expire_soon: tariff.is_expire_soon == '1' ? true : false,
+                    tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
+                    countFinishedLessons: countFinishedLessons,
+                    countNewLessons: custom_ind_period_limit - countFinishedLessons,
+                    regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson: any) => ({
+                        id: lesson.id,
+                        alfa_customer_id: lesson.alfa_customer_id,
+                        lesson_type_id: lesson.lesson_type_id,
+                        subject_id: lesson.subject_id,
+                        day: lesson.day,
+                        teacher_id: lesson.teacher_id,
+                        external_id: lesson.external_id,
+                        b_date: lesson.b_date,
+                        e_date: lesson.e_date,
+                        time_from: lesson.time_from,
+                        time_to: lesson.time_to,
+                        created_at: lesson.created_at,
+                        updated_at: lesson.updated_at,
+                        is_active: lesson.is_active,
+                        need_prolong: lesson.need_prolong,
+                        parent_id: lesson.parent_id,
+                        created_by: lesson.created_by,
+                        expired: lesson.expired,
+                        customerString: lesson.customerString,
+                        adminString: lesson.adminString,
+                        beginLocalHuman: lesson.beginLocalHuman,
+                        endLocalHuman: lesson.endLocalHuman
+                    })) : [] // Расписание регулярных урок с нужными полями
+                };
+            }));
+
             return mappedTariffs;
         }
-        return mappedTariffs;
+
     } catch (error) {
         console.error('Error getting customer tariffs:', error);
         return null;
@@ -231,16 +245,16 @@ export const getCustomerTariffs = async (customerId: string, clientToken: string
 }
 
 // Получение расписания тарифа клиента
-export const getCustomerTariffSchedule = async (tariffId: string, clientToken: string): Promise<any> => {
+export const getCustomerTariffSchedule = async (tariffId: string, clientToken: string, apiConfig: AdminConfig): Promise<any> => {
     try {
-        const response = await fetch(`${BASE_URL}/api/customer_tariff/${tariffId}/schedule`, {
+        const response = await fetch(`${apiConfig.url}/api/customer_tariff/${tariffId}/schedule`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
 
@@ -257,16 +271,16 @@ export const getCustomerTariffSchedule = async (tariffId: string, clientToken: s
 }
 
 // Получение расписания регулярных уроков клиента
-export const getRegularLessonsSchedule = async (customerId: string, clientToken: string): Promise<any> => {
+export const getRegularLessonsSchedule = async (customerId: string, clientToken: string, apiConfig: AdminConfig): Promise<any> => {
     try {
-        const response = await fetch(`${BASE_URL}/api/regular_lessons/schedule/${customerId}`, {
+        const response = await fetch(`${apiConfig.url}/api/regular_lessons/schedule/${customerId}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
 
@@ -283,10 +297,10 @@ export const getRegularLessonsSchedule = async (customerId: string, clientToken:
 }
 
 // Получение последних уроков
-export const getLastLessons = async (customerId: string, customerHash: string): Promise<any> => {
+export const getLastLessons = async (customerId: string, customerHash: string, apiConfig: AdminConfig): Promise<any> => {
     try {
         // Сначала получаем клиентский токен
-        const tokenData = await getClientToken(customerId, customerHash);
+        const tokenData = await getClientToken(customerId, customerHash, apiConfig);
         if (!tokenData || !tokenData.token) {
             return {
                 success: false,
@@ -295,14 +309,14 @@ export const getLastLessons = async (customerId: string, customerHash: string): 
         }
 
         // Получаем последние уроки используя клиентский токен
-        const response = await fetch(`${BASE_URL}/govorikaalfa/api/last_lessons`, {
+        const response = await fetch(`${apiConfig.url}/govorikaalfa/api/last_lessons`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${tokenData.token}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
 
@@ -319,10 +333,10 @@ export const getLastLessons = async (customerId: string, customerHash: string): 
 }
 
 // Комбинированная функция для получения токена и тарифов
-export const getCustomerData = async (customerId: string, customerHash: string): Promise<any> => {
+export const getCustomerData = async (customerId: string, customerHash: string, apiConfig: AdminConfig): Promise<any> => {
     try {
         // Сначала получаем клиентский токен
-        const tokenData = await getClientToken(customerId, customerHash);
+        const tokenData = await getClientToken(customerId, customerHash, apiConfig);
         if (!tokenData || !tokenData.token) {
             return {
                 success: false,
@@ -331,7 +345,7 @@ export const getCustomerData = async (customerId: string, customerHash: string):
         }
 
         // Затем получаем тарифы клиента
-        const tariffsData = await getCustomerTariffs(customerId, tokenData.token);
+        const tariffsData = await getCustomerTariffs(customerId, tokenData.token, apiConfig);
         if (!tariffsData) {
             return {
                 success: false,
@@ -356,17 +370,18 @@ export const getCustomerData = async (customerId: string, customerHash: string):
 export const getCustomerRegularLessons = async (
     customerId: string, 
     subjectId: number, 
-    clientToken: string
+    clientToken: string,
+    apiConfig: AdminConfig
 ): Promise<any> => {
     try {
         let url: string;
         
         if (subjectId === 0) {
             // Если subjectId = 0, получаем все предметы
-            url = `${BASE_URL}/api/customer_regular_lessons/${customerId}`;
+            url = `${apiConfig.url}/api/customer_regular_lessons/${customerId}`;
         } else {
             // Если указан конкретный предмет
-            url = `${BASE_URL}/api/customer_regular_lessons/${customerId}/${subjectId}`;
+            url = `${apiConfig.url}/api/customer_regular_lessons/${customerId}/${subjectId}`;
         }
 
         const response = await fetch(url, {
@@ -375,8 +390,8 @@ export const getCustomerRegularLessons = async (
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig}/login`
             }
         });
 
@@ -393,15 +408,15 @@ export const getCustomerRegularLessons = async (
 }
 
 // Получение доступных тарифов для клиента
-export const getAvailableTariffs = async (customerId: string): Promise<any> => {
+export const getAvailableTariffs = async (customerId: string, apiConfig: AdminConfig): Promise<any> => {
     try {
-        const response = await fetch(`${BASE_URL}/api/tariff?customer_id=${customerId}`, {
+        const response = await fetch(`${apiConfig.url}/api/tariff?customer_id=${customerId}`, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
 
@@ -437,16 +452,16 @@ export const getAvailableTariffs = async (customerId: string): Promise<any> => {
 
 
 // Получение структурированных данных клиента для интерфейса
-export const getCustomerInterfaceData = async (customerId: string, customerHash: string): Promise<ClientResponse> => {
+export const getCustomerInterfaceData = async (customerId: string, customerHash: string, apiConfig: AdminConfig): Promise<ClientResponse> => {
     try {
         // Сначала получаем клиентский токен
-        const tokenData = await getClientToken(customerId, customerHash);
+        const tokenData = await getClientToken(customerId, customerHash, apiConfig);
         if (!tokenData || !tokenData.token) {
             throw new Error('Failed to get client token');
         }
 
         // Получаем данные клиента и уроков
-        const lessonsData = await getLastLessons(customerId, customerHash);
+        const lessonsData = await getLastLessons(customerId, customerHash, apiConfig);
 
 
         if (!lessonsData) {
@@ -463,12 +478,12 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
             //console.warn("====== teacher ======", teacher);
           // console.warn("====== customer ======", customer);
             // Получаем тарифы клиента с расписанием через API
-            const customerTariffs = await getCustomerTariffs(customer.id.toString(), tokenData.token);
+            const customerTariffs = await getCustomerTariffs(customer.id.toString(), tokenData.token, apiConfig);
             //console.warn("====== customerTariffs ======", customerTariffs);
 
             // Получаем встречи клиента (используем индивидуальный c_hash каждого customer)
             const customerSpecificHash = customer.c_hash || customerHash; // Fallback на общий hash если нет индивидуального
-            const meetingsData = await getCustomerMeetings(customer.id.toString(), customerSpecificHash);
+            const meetingsData = await getCustomerMeetings(customer.id.toString(), customerSpecificHash, apiConfig);
 
             // Обрабатываем данные встреч
             let lastRecord = null;
@@ -525,6 +540,8 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
                 subscriptions: customerTariffs, // Помещаем тарифы с расписанием из API
             };
         }));
+
+        
 
         return {
             environment: Environment.GOVORIKA,
@@ -613,9 +630,18 @@ export const getCustomerDataByToken = async (token: string): Promise<ClientRespo
     try {
         // Расшифровываем токен
         const tokenData = decodeCustomerToken(token);
+
+        console.warn("====== DECODE tokenData ======", tokenData);
+
+        let env = tokenData?.data?.env || '';
+        console.warn("====== env ======", env);
+        
+        let apiConfig = getAdminConfig(env);
+        console.warn("====== apiConfig ======", apiConfig);
+
         
         if (!tokenData.success || !tokenData.data) {
-            throw new Error(tokenData.error || 'Ошибка расшифровки токена');
+            throw new Error(tokenData.error || 'Failed to decode token');
         }
         console.warn("====== tokenData ======", tokenData);
         const { clientId: customerId, hash: customerHash } = tokenData.data;
@@ -625,7 +651,7 @@ export const getCustomerDataByToken = async (token: string): Promise<ClientRespo
 
         
         // Получаем данные клиента используя существующую функцию
-        return await getCustomerInterfaceData(customerId, customerHash);
+        return await getCustomerInterfaceData(customerId, customerHash, apiConfig);
         
     } catch (error) {
         console.error('Error getting customer data by token:', error);
@@ -634,9 +660,9 @@ export const getCustomerDataByToken = async (token: string): Promise<ClientRespo
 }
 
 // Получение календаря клиента
-export const getCustomerCalendar = async (customerId: string, startDate: string, endDate: string): Promise<any> => {
+export const getCustomerCalendar = async (customerId: string, startDate: string, endDate: string, apiConfig: AdminConfig): Promise<any> => {
     try {
-        const url = `${BASE_URL}/api2/alfa_calendars?customerId=${customerId}&from=${startDate}&to=${endDate}`;
+        const url = `${apiConfig.url}/api2/alfa_calendars?customerId=${customerId}&from=${startDate}&to=${endDate}`;
         
         const response = await fetch(url, {
             method: 'GET',
@@ -663,11 +689,40 @@ export const getCustomerCalendar = async (customerId: string, startDate: string,
     }
 }
 
+export const countLessonsCustomerCalendar = async (customerId: string, startDate: string, endDate: string, apiConfig: AdminConfig): Promise<any> => {
+    try {
+        const url = `${apiConfig.url}/api2/alfa_calendars?customerId=${customerId}&from=${startDate}&to=${endDate}`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': 'da120237-3293-4017-a2d6-d5b31c873d38',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.warn("====== data ======", data);
+        console.warn("=====LESSONS COUNT ======");
+        return data;
+    } catch (error) {
+        console.error('Error getting customer calendar:', error);
+        return {
+            success: false,
+            error: 'Failed to get customer calendar'
+        };
+    }
+}
+
 // Получение встреч клиента
-export const getCustomerMeetings = async (customerId: string, customerHash: string): Promise<any> => {
+export const getCustomerMeetings = async (customerId: string, customerHash: string, apiConfig: AdminConfig): Promise<any> => {
     try {
         // Сначала получаем клиентский токен
-        const tokenData = await getClientToken(customerId, customerHash);
+        const tokenData = await getClientToken(customerId, customerHash, apiConfig);
         if (!tokenData || !tokenData.token) {
             return {
                 success: false,
@@ -676,14 +731,14 @@ export const getCustomerMeetings = async (customerId: string, customerHash: stri
         }
 
         // Получаем встречи клиента
-        const response = await fetch(`${BASE_URL}/govorikaalfa/api/customer/${customerId}/${customerHash}/meetings`, {
+        const response = await fetch(`${apiConfig.url}/govorikaalfa/api/customer/${customerId}/${customerHash}/meetings`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${tokenData.token}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL,
-                'Referer': `${BASE_URL}/login`
+                'Origin': apiConfig.url,
+                'Referer': `${apiConfig.url}/login`
             }
         });
 
@@ -703,10 +758,10 @@ export const getCustomerMeetings = async (customerId: string, customerHash: stri
 }
 
 // Получение клиентского токена через админский токен
-export const getClientTokenByAdmin = async (customerId: string, customerHash: string): Promise<any> => {
+export const getClientTokenByAdmin = async (customerId: string, customerHash: string, apiConfig: AdminConfig): Promise<any> => {
     try {
         // Сначала получаем админский токен
-        const adminLoginResponse = await loginToAdminPanel();
+        const adminLoginResponse = await loginToAdminPanel(apiConfig);
         if (!adminLoginResponse.success) {
             return {
                 success: false,
@@ -723,13 +778,13 @@ export const getClientTokenByAdmin = async (customerId: string, customerHash: st
         }
 
         // Получаем клиентский токен используя админский токен
-        const response = await fetch(`${BASE_URL}/govorikaalfa/api/login/${customerId}/${customerHash}`, {
+        const response = await fetch(`${apiConfig.url}/govorikaalfa/api/login/${customerId}/${customerHash}`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${adminToken.token}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL
+                'Origin': apiConfig.url
             }
         });
 
@@ -752,16 +807,16 @@ export const getClientTokenByAdmin = async (customerId: string, customerHash: st
 }
 
 // Получение свободных слотов для переноса урока с клиентским токеном
-export const getLessonAvailableSlotsWithClientToken = async (lessonId: string, clientToken: string): Promise<any> => {
+export const getLessonAvailableSlotsWithClientToken = async (lessonId: string, clientToken: string, apiConfig: AdminConfig): Promise<any> => {
     try {
         // Получаем свободные слоты для урока используя клиентский токен
-        const response = await fetch(`${BASE_URL}/govorikaalfa/api/last_lesson/${lessonId}/next_times`, {
+        const response = await fetch(`${apiConfig.url}/govorikaalfa/api/last_lesson/${lessonId}/next_times`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL
+                'Origin': apiConfig.url
             }
         });
 
@@ -784,16 +839,16 @@ export const getLessonAvailableSlotsWithClientToken = async (lessonId: string, c
 }
 
 // Обновление урока (изменение времени/даты) с клиентским токеном
-export const updateLessonWithClientToken = async (lessonId: string, lessonData: any, clientToken: string): Promise<any> => {
+export const updateLessonWithClientToken = async (lessonId: string, lessonData: any, clientToken: string, apiConfig: AdminConfig): Promise<any> => {
     try {
         // Обновляем урок используя клиентский токен
-        const response = await fetch(`${BASE_URL}/govorikaalfa/api/last_lesson/${lessonId}`, {
+        const response = await fetch(`${apiConfig.url}/govorikaalfa/api/last_lesson/${lessonId}`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${clientToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Origin': BASE_URL
+                'Origin': apiConfig.url
             },
             body: JSON.stringify(lessonData)
         });
