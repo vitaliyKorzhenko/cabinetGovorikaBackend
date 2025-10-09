@@ -179,17 +179,26 @@ export const getCustomerTariffs = async (customerId: string, clientToken: string
                 const lessons = await getCustomerCalendar(
                     customerId,
                     tariff.begin_date_c,
-                    today,
+                    tariff.end_date_c,
                     apiConfig
                 );
                 console.log('===== from ======', tariff.begin_date_c);
-                console.log('===== to ======', today);
+                console.log('===== to ======', tariff.end_date_c);
                 console.log('===== lessonsCount ======', lessons[0]);
                 let countFinishedLessons = 0;
+                let countNewLessons = 0;
                 if (lessons && lessons.length > 0) {
                     for (let lesson of lessons) {
-                        if (lesson.status == 3 && !lesson.reason_id) {
+                        // Считаем прошедшие уроки до сегодняшнего дня
+                        if (lesson.start < today && lesson.status == 3 && !lesson.reason_id) {
                             countFinishedLessons++;
+                        }
+                        // Считаем новые уроки от сегодняшнего дня
+                        if (lesson.start >= today) {
+                            console.log('===== lesson. NEW status ======', lesson);
+                            if (lesson.status == 1 || lesson.status == 4) {
+                            countNewLessons++;
+                            }
                         }
                     }
                 }
@@ -208,6 +217,7 @@ export const getCustomerTariffs = async (customerId: string, clientToken: string
                     tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
                     countFinishedLessons: countFinishedLessons,
                     countNewLessons: custom_ind_period_limit - countFinishedLessons,
+                    countBonusLessons: custom_ind_period_limit - countFinishedLessons - countNewLessons,
                     regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson: any) => ({
                         id: lesson.id,
                         alfa_customer_id: lesson.alfa_customer_id,

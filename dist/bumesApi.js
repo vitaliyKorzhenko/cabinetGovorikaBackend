@@ -137,15 +137,24 @@ const getCustomerTariffs = (customerId, clientToken, apiConfig) => __awaiter(voi
             const today = new Date().toISOString().split('.')[0]; // Формат: 2025-09-01T00:00:00
             mappedTariffs = yield Promise.all(tarrifData.map((tariff) => __awaiter(void 0, void 0, void 0, function* () {
                 // Считаем уроки от начала тарифа до сегодня
-                const lessons = yield (0, exports.getCustomerCalendar)(customerId, tariff.begin_date_c, today, apiConfig);
+                const lessons = yield (0, exports.getCustomerCalendar)(customerId, tariff.begin_date_c, tariff.end_date_c, apiConfig);
                 console.log('===== from ======', tariff.begin_date_c);
-                console.log('===== to ======', today);
+                console.log('===== to ======', tariff.end_date_c);
                 console.log('===== lessonsCount ======', lessons[0]);
                 let countFinishedLessons = 0;
+                let countNewLessons = 0;
                 if (lessons && lessons.length > 0) {
                     for (let lesson of lessons) {
-                        if (lesson.status == 3 && !lesson.reason_id) {
+                        // Считаем прошедшие уроки до сегодняшнего дня
+                        if (lesson.start < today && lesson.status == 3 && !lesson.reason_id) {
                             countFinishedLessons++;
+                        }
+                        // Считаем новые уроки от сегодняшнего дня
+                        if (lesson.start >= today) {
+                            console.log('===== lesson. NEW status ======', lesson);
+                            if (lesson.status == 1 || lesson.status == 4) {
+                                countNewLessons++;
+                            }
                         }
                     }
                 }
@@ -164,6 +173,7 @@ const getCustomerTariffs = (customerId, clientToken, apiConfig) => __awaiter(voi
                     tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
                     countFinishedLessons: countFinishedLessons,
                     countNewLessons: custom_ind_period_limit - countFinishedLessons,
+                    countBonusLessons: custom_ind_period_limit - countFinishedLessons - countNewLessons,
                     regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson) => ({
                         id: lesson.id,
                         alfa_customer_id: lesson.alfa_customer_id,
