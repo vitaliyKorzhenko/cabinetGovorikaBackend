@@ -142,21 +142,27 @@ const getCustomerTariffs = (customerId, clientToken, apiConfig) => __awaiter(voi
                 console.log('===== to ======', tariff.end_date_c);
                 console.log('===== lessonsCount ======', lessons[0]);
                 let countFinishedLessons = 0;
+                let countNewLessons = 0;
                 if (lessons && lessons.length > 0) {
                     for (let lesson of lessons) {
                         // Считаем прошедшие уроки до сегодняшнего дня
                         if (lesson.start < today && lesson.status == 3 && !lesson.reason_id) {
                             countFinishedLessons++;
                         }
+                        if (lesson.start >= today) {
+                            if (lesson.status == 1 || lesson.status == 4) {
+                                countNewLessons++;
+                            }
+                        }
                     }
                 }
-                let totalLessons = tariff.custom_ind_period_limit ? Number(tariff.custom_ind_period_limit) : 0;
-                console.warn('===== totalLessons use custom_ind_period_limit ======', totalLessons);
-                console.warn('===== countFinishedLessons ======', countFinishedLessons);
-                let countNewLessons = totalLessons > 0 ? Number(totalLessons) - Number(countFinishedLessons) : 0;
-                console.warn('===== countNewLessons ======', countNewLessons);
-                let countBonusLessons = totalLessons > 0 ? Number(totalLessons) - Number(countFinishedLessons) - Number(countNewLessons) : 0;
-                console.warn('===== countBonusLessons ======', countBonusLessons);
+                const totalLessons = Number(tariff.custom_ind_period_limit) || 0;
+                const finished = Number(countFinishedLessons) || 0;
+                const countBonusLessons = Math.max(finished - totalLessons - countNewLessons, 0);
+                console.warn('totalLessons =', totalLessons);
+                console.warn('finished =', finished);
+                console.warn('countNewLessons =', countNewLessons);
+                console.warn('countBonusLessons =', countBonusLessons);
                 return {
                     id: tariff.id,
                     type: tariff.type,
@@ -169,7 +175,7 @@ const getCustomerTariffs = (customerId, clientToken, apiConfig) => __awaiter(voi
                     custom_ind_period_limit: totalLessons,
                     is_expire_soon: tariff.is_expire_soon == '1' ? true : false,
                     tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
-                    countFinishedLessons: countFinishedLessons,
+                    countFinishedLessons: finished,
                     countNewLessons: countNewLessons,
                     countBonusLessons: countBonusLessons,
                     regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson) => ({
