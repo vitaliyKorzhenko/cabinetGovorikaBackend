@@ -186,19 +186,21 @@ export const getCustomerTariffs = async (customerId: string, clientToken: string
                 console.log('===== to ======', tariff.end_date_c);
                 console.log('===== lessonsCount ======', lessons[0]);
                 let countFinishedLessons = 0;
-                let totalLessons = lessons.length;
                 if (lessons && lessons.length > 0) {
                     for (let lesson of lessons) {
                         // Считаем прошедшие уроки до сегодняшнего дня
                         if (lesson.start < today && lesson.status == 3 && !lesson.reason_id) {
                             countFinishedLessons++;
                         }
-                        // Считаем новые уроки от сегодняшнего дня
-                        
                     }
                 }
-                let countNewLessons = totalLessons > 0 ? totalLessons - countFinishedLessons : 0;
-                let custom_ind_period_limit = tariff.custom_ind_period_limit ? tariff.custom_ind_period_limit : 0;
+                let totalLessons = tariff.custom_ind_period_limit ? Number(tariff.custom_ind_period_limit) : 0;
+                console.warn('===== totalLessons use custom_ind_period_limit ======', totalLessons);
+                console.warn('===== countFinishedLessons ======', countFinishedLessons);
+                let countNewLessons = totalLessons > 0 ? Number(totalLessons) - Number(countFinishedLessons) : 0;
+                console.warn('===== countNewLessons ======', countNewLessons);
+                let countBonusLessons = totalLessons > 0 ? Number(totalLessons) - Number(countFinishedLessons) - Number(countNewLessons) : 0;
+                console.warn('===== countBonusLessons ======', countBonusLessons);
                 return {
                     id: tariff.id,
                     type: tariff.type,
@@ -213,7 +215,7 @@ export const getCustomerTariffs = async (customerId: string, clientToken: string
                     tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
                     countFinishedLessons: countFinishedLessons,
                     countNewLessons: countNewLessons,
-                    countBonusLessons: totalLessons > 0 ?  totalLessons - countFinishedLessons - countNewLessons : 0,    
+                    countBonusLessons: countBonusLessons,
                     regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson: any) => ({
                         id: lesson.id,
                         alfa_customer_id: lesson.alfa_customer_id,
