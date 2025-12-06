@@ -204,7 +204,7 @@ export const getCustomerTariffs = async (customerId: string, clientToken: string
                 
                 
                 
-                
+                //custom_ind_period_limit коливо укроков для абонементов по периоду 
                 const totalLessons = Number(tariff.custom_ind_period_limit) || 0;
                 const finished = Number(countFinishedLessons) || 0;
                 const countBonusLessons = Math.max(finished - totalLessons - countNewLessons, 0);
@@ -523,6 +523,16 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
                 name: customer.kid_parent_name
             };
 
+            let customerLanguage = null;
+            let customerInfoUseToken = await getCustomerWithClientToken(tokenData.token, apiConfig);
+            if (customerInfoUseToken.success) {
+                let customerInfo  = customerInfoUseToken.data;
+                console.error(" ======== FULL CUSTOMER DATA ======", customerInfo);
+                customerLanguage = customerInfo?.bumess_chat?.sub_project?.language_iso2 || '';
+
+            }
+
+
             return {
                 
                 id: customer.id,
@@ -535,11 +545,11 @@ export const getCustomerInterfaceData = async (customerId: string, customerHash:
                 custom_hash: customer.custom_hash,
                 calendar_hash: customer.calendar_hash,
                 birthday: customer.birthday,
-                real_timezone: customer.timezone,
+                real_timezone: customer.real_timezone,
                 timezone: customer.timezone,
                 hobby: customer.hobby,
                 age: customer.custom_age ? parseFloat(customer.custom_age) : 0,
-                language: null, // Пока оставляем null, так как в данных нет информации о языке
+                language: customerLanguage, // Пока оставляем null, так как в данных нет информации о языке
                 balance: customer.balance || 0,
                 environment: Environment.GOVORIKA,
                // available_subscriptions: availableTariffs, // Помещаем доступные тарифы
@@ -890,6 +900,38 @@ export const updateLessonWithClientToken = async (lessonId: string, lessonData: 
         return {
             success: false,
             error: 'Failed to update lesson'
+        };
+    }
+}
+
+// Получение данных клиента с клиентским токеном
+export const getCustomerWithClientToken = async (clientToken: string, apiConfig: AdminConfig): Promise<any> => {
+    try {
+        // Получаем данные клиента используя клиентский токен
+        const response = await fetch(`${apiConfig.url}/govorikaalfa/api/customer`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': apiConfig.url
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return {
+            success: true,
+            data: data
+        };
+    } catch (error) {
+        console.error('Error getting customer with client token:', error);
+        return {
+            success: false,
+            error: 'Failed to get customer data'
         };
     }
 }

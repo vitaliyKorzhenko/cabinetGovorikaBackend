@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateLessonWithClientToken = exports.getLessonAvailableSlotsWithClientToken = exports.getClientTokenByAdmin = exports.getCustomerMeetings = exports.countLessonsCustomerCalendar = exports.getCustomerCalendar = exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
+exports.getCustomerWithClientToken = exports.updateLessonWithClientToken = exports.getLessonAvailableSlotsWithClientToken = exports.getClientTokenByAdmin = exports.getCustomerMeetings = exports.countLessonsCustomerCalendar = exports.getCustomerCalendar = exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
 const apiConfig_1 = require("./apiConfig");
 const apiReference_1 = require("./apiReference");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
@@ -156,6 +156,7 @@ const getCustomerTariffs = (customerId, clientToken, apiConfig) => __awaiter(voi
                         }
                     }
                 }
+                //custom_ind_period_limit коливо укроков для абонементов по периоду 
                 const totalLessons = Number(tariff.custom_ind_period_limit) || 0;
                 const finished = Number(countFinishedLessons) || 0;
                 const countBonusLessons = Math.max(finished - totalLessons - countNewLessons, 0);
@@ -419,6 +420,7 @@ const getCustomerInterfaceData = (customerId, customerHash, apiConfig) => __awai
         let parent = null;
         //first lesson data log
         const children = yield Promise.all(lessonsData.map((lesson) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a, _b;
             //console.warn("====== lesson ======", lesson);
             const customer = lesson.customer;
             const teacher = lesson.teacher;
@@ -442,6 +444,13 @@ const getCustomerInterfaceData = (customerId, customerHash, apiConfig) => __awai
                 id: customer.parent_id,
                 name: customer.kid_parent_name
             };
+            let customerLanguage = null;
+            let customerInfoUseToken = yield (0, exports.getCustomerWithClientToken)(tokenData.token, apiConfig);
+            if (customerInfoUseToken.success) {
+                let customerInfo = customerInfoUseToken.data;
+                console.error(" ======== FULL CUSTOMER DATA ======", customerInfo);
+                customerLanguage = ((_b = (_a = customerInfo === null || customerInfo === void 0 ? void 0 : customerInfo.bumess_chat) === null || _a === void 0 ? void 0 : _a.sub_project) === null || _b === void 0 ? void 0 : _b.language_iso2) || '';
+            }
             return {
                 id: customer.id,
                 game_url: lesson.game_url,
@@ -453,11 +462,11 @@ const getCustomerInterfaceData = (customerId, customerHash, apiConfig) => __awai
                 custom_hash: customer.custom_hash,
                 calendar_hash: customer.calendar_hash,
                 birthday: customer.birthday,
-                real_timezone: customer.timezone,
+                real_timezone: customer.real_timezone,
                 timezone: customer.timezone,
                 hobby: customer.hobby,
                 age: customer.custom_age ? parseFloat(customer.custom_age) : 0,
-                language: null, // Пока оставляем null, так как в данных нет информации о языке
+                language: customerLanguage, // Пока оставляем null, так как в данных нет информации о языке
                 balance: customer.balance || 0,
                 environment: apiReference_1.Environment.GOVORIKA,
                 // available_subscriptions: availableTariffs, // Помещаем доступные тарифы
@@ -782,3 +791,34 @@ const updateLessonWithClientToken = (lessonId, lessonData, clientToken, apiConfi
     }
 });
 exports.updateLessonWithClientToken = updateLessonWithClientToken;
+// Получение данных клиента с клиентским токеном
+const getCustomerWithClientToken = (clientToken, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Получаем данные клиента используя клиентский токен
+        const response = yield fetch(`${apiConfig.url}/govorikaalfa/api/customer`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${clientToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': apiConfig.url
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = yield response.json();
+        return {
+            success: true,
+            data: data
+        };
+    }
+    catch (error) {
+        console.error('Error getting customer with client token:', error);
+        return {
+            success: false,
+            error: 'Failed to get customer data'
+        };
+    }
+});
+exports.getCustomerWithClientToken = getCustomerWithClientToken;

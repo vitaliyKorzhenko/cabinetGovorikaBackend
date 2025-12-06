@@ -104,7 +104,7 @@ app.post('/api/generate-token', async (req, res) => {
   }
 });
 
-// API для получения данных клиента по JWT токену
+// API для получения данных клиента по JWT токену (из URL параметра)
 app.get('/api/customer-info-token/:token', async (req, res) => {
   try {
     const { token } = req.params;
