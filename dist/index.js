@@ -264,5 +264,5 @@ app.put('/api/update-lesson/:lessonId/:customerId/:customerHash/:env', (req, res
 }));
 const server = http_1.default.createServer(app);
 server.listen(port, () => {
-    console.log(`🚀 Сервер запущен на порту ${port}`);
+    console.log(`🚀 Сервер запущен на порту NEW NEW ${port}`);
 });
