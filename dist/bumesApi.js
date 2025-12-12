@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCustomerWithClientToken = exports.updateLessonWithClientToken = exports.getLessonAvailableSlotsWithClientToken = exports.getClientTokenByAdmin = exports.getCustomerMeetings = exports.countLessonsCustomerCalendar = exports.getCustomerCalendar = exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
+exports.getTarifStats = exports.getCustomerWithClientToken = exports.updateLessonWithClientToken = exports.getLessonAvailableSlotsWithClientToken = exports.getClientTokenByAdmin = exports.getCustomerMeetings = exports.countLessonsCustomerCalendar = exports.getCustomerCalendar = exports.getCustomerDataByToken = exports.decodeCustomerToken = exports.generateCustomerToken = exports.getCustomerInterfaceData = exports.getAvailableTariffs = exports.getCustomerRegularLessons = exports.getCustomerData = exports.getLastLessons = exports.getRegularLessonsSchedule = exports.getCustomerTariffSchedule = exports.getCustomerTariffs = exports.getClientToken = exports.loginToAdminPanel = exports.clearToken = exports.setCurrentToken = exports.getCurrentToken = exports.setCredentials = void 0;
 const apiConfig_1 = require("./apiConfig");
 const apiReference_1 = require("./apiReference");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
@@ -164,7 +164,25 @@ const getCustomerTariffs = (customerId, clientToken, apiConfig) => __awaiter(voi
                 console.warn('finished =', finished);
                 console.warn('countNewLessons =', countNewLessons);
                 console.warn('countBonusLessons =', countBonusLessons);
-                return {
+                // Получаем статистику тарифа
+                let tariffStatsData = null;
+                if (tariff.id) {
+                    try {
+                        const tariffStats = yield (0, exports.getTarifStats)(tariff.id, apiConfig);
+                        console.log('===== tariffStats for tariff', tariff.id, '=====', JSON.stringify(tariffStats, null, 2));
+                        if (tariffStats && tariffStats.success && tariffStats.data) {
+                            tariffStatsData = tariffStats.data;
+                            console.log('===== tariffStatsData extracted =====', JSON.stringify(tariffStatsData, null, 2));
+                        }
+                        else {
+                            console.warn('===== tariffStats failed or no data for tariff', tariff.id, '=====', tariffStats);
+                        }
+                    }
+                    catch (error) {
+                        console.error('===== Error getting tariff stats for', tariff.id, '=====', error);
+                    }
+                }
+                const tariffObject = {
                     id: tariff.id,
                     type: tariff.type,
                     name: tariff.name,
@@ -176,10 +194,24 @@ const getCustomerTariffs = (customerId, clientToken, apiConfig) => __awaiter(voi
                     custom_ind_period_limit: totalLessons,
                     is_expire_soon: tariff.is_expire_soon == '1' ? true : false,
                     tariff_type: tariff.tariff ? tariff.tariff.tariff_type : '',
-                    countFinishedLessons: finished,
-                    countNewLessons: countNewLessons,
-                    countBonusLessons: countBonusLessons,
-                    regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson) => ({
+                };
+                // Добавляем статистику если есть
+                if (tariffStatsData) {
+                    tariffObject.total_lesson_count = tariffStatsData.total_lesson_count;
+                    tariffObject.lessons_done_count = tariffStatsData.lessons_done_count;
+                    tariffObject.less_lessons = tariffStatsData.less_lessons;
+                    tariffObject.bonus = tariffStatsData.bonus;
+                    console.log('===== Added stats to tariff', tariff.id, '=====', {
+                        total_lesson_count: tariffStatsData.total_lesson_count,
+                        lessons_done_count: tariffStatsData.lessons_done_count,
+                        less_lessons: tariffStatsData.less_lessons,
+                        bonus: tariffStatsData.bonus
+                    });
+                }
+                else {
+                    console.warn('===== No stats data for tariff', tariff.id, '=====');
+                }
+                return Object.assign(Object.assign({}, tariffObject), { regular_lessons: tariff.regular_lessons ? tariff.regular_lessons.map((lesson) => ({
                         id: lesson.id,
                         alfa_customer_id: lesson.alfa_customer_id,
                         lesson_type_id: lesson.lesson_type_id,
@@ -203,7 +235,7 @@ const getCustomerTariffs = (customerId, clientToken, apiConfig) => __awaiter(voi
                         beginLocalHuman: lesson.beginLocalHuman,
                         endLocalHuman: lesson.endLocalHuman
                     })) : [] // Расписание регулярных урок с нужными полями
-                };
+                 });
             })));
             return mappedTariffs;
         }
@@ -822,3 +854,35 @@ const getCustomerWithClientToken = (clientToken, apiConfig) => __awaiter(void 0,
     }
 });
 exports.getCustomerWithClientToken = getCustomerWithClientToken;
+// Получение статистики тарифа с API Key
+const getTarifStats = (tariffId, apiConfig) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Получаем статистику тарифа используя API Key
+        const response = yield fetch(`${apiConfig.url}/api2/customer_tariff/stat/${tariffId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': 'da120237-3293-4017-a2d6-d5b31c873d38',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const responseData = yield response.json();
+        // API возвращает { success: true, message: "OK", data: { total_lesson_count, lessons_done_count, ... } }
+        const statsData = responseData.data || responseData;
+        return {
+            success: true,
+            data: statsData
+        };
+    }
+    catch (error) {
+        console.error('Error getting tariff stats:', error);
+        return {
+            success: false,
+            error: 'Failed to get tariff stats'
+        };
+    }
+});
+exports.getTarifStats = getTarifStats;
